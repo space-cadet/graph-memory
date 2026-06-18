@@ -41,3 +41,45 @@
 **Solution**: `NAME_ALIASES` map in `entity-extractor.cjs` normalizes to canonical form  
 **Trade-off**: Hardcoded list; needs user customization for different workspaces  
 **Status**: Implemented, needs generalization
+
+## Pattern: Tiered Memory Graph
+
+**Context**: Raw sessions, summaries, topics, and long-term knowledge have different lifecycles and query patterns
+**Solution**: Four-tier architecture with upward data flow and distinct retention policies
+- T1: Raw sessions (90-day retention, archived)
+- T2: Session summaries with embeddings (persistent)
+- T3: Topic clusters (ephemeral, computed on query)
+- T4: Long-term knowledge (persistent, human-reviewed)
+**Trade-off**: More complex than flat graph, but enables "active work" vs "historical context" queries
+**Status**: Designed (T6-T11)
+
+## Pattern: LLM-Based Entity Extraction
+
+**Context**: Regex patterns miss ~90% of meaningful entities (concepts, decisions, topics)
+**Solution**: Replace regex with LLM extraction per session batch
+**Trade-off**: API cost ($0.001-0.01/session) vs extraction quality
+**Alternative**: Local model (Ollama) for zero cost, slower throughput
+**Status**: Designed (T6)
+
+## Pattern: Semantic Search via Embeddings
+
+**Context**: Literal string search can't bridge vocabulary gaps ("chat component" ≠ "chimera-chat")
+**Solution**: Store 384-dim embedding vectors per session summary and entity
+**Trade-off**: ~1.5KB per embedding, but enables cosine similarity search
+**Model**: all-MiniLM-L6-v2 (fast) or all-mpnet-base-v2 (better quality)
+**Status**: Designed (T7)
+
+## Pattern: Temporal Relationship Decay
+
+**Context**: All relationships treated equally — can't distinguish active from stale
+**Solution**: Relationships have strength (0.0-1.0) that decays over time, reinforced by mentions
+**Trade-off**: Requires periodic recalculation, but enables "show me active projects" queries
+**Decay rule**: strength(t) = strength_0 × 0.5^(days / half_life)
+**Status**: Designed (T9)
+
+## Pattern: Multi-Source Context Ingestion
+
+**Context**: Graph only knows conversation content, not actual work activity
+**Solution**: Ingest git commits, file modifications, calendar events, arXiv API
+**Trade-off**: More complex pipeline, but richer context for agent queries
+**Status**: Designed (T10)

@@ -57,3 +57,49 @@
 - 2026-05-20: 238 entities, 24,906 relationships from 24 journal files
 - 2026-06-18: Graph grown to 881 entities, 103,778 relationships (but stale)
 - 2026-06-18: Identified critical gap: extraction from truncated summaries, not full text
+
+## 2026-06-19 — Architectural Review: Robust Memory System Design
+
+### Session: Night (02:07-02:23 IST)
+- **Focus**: Comprehensive architecture review and improvement planning
+- **Status**: Planning complete, 6 new tasks created (T6-T11)
+
+#### Completed
+- ✅ Cloned graph-memory repo into `code/graph-memory/`
+- ✅ Initialized `.openclaw_memory/graph.db` from local sessions (931 sessions → 154 entities → 3,653 relationships)
+- ✅ Validated current extraction quality: "quantum" → 0, "chimera" → 0, "obsidian" → 0
+- ✅ Confirmed regex extraction captures only ~10% of meaningful content
+- ✅ Identified 6 architectural phases for robust memory system
+- ✅ Created implementation docs:
+  - `implementation-details/T6-architectural-plan.md` (6-phase plan)
+  - `implementation-details/tiered-memory-graph.md` (architecture spec)
+- ✅ Added tasks T6-T11 to database and regenerated markdown files
+- ✅ Updated knowledge layer: activeContext.md, systemPatterns.md
+
+#### Key Findings
+| Problem | Evidence | Solution |
+|---------|----------|----------|
+| Regex misses concepts | "quantum" → 0 results | LLM extraction (T6) |
+| Flat relationships | 91% are `mentioned_with` | Temporal decay (T9) |
+| No semantic search | "chat component" ≠ "chimera-chat" | Vector embeddings (T7) |
+| Synchronous extraction | Heartbeat blocks for minutes | Background queue (T8) |
+| Single source | Only session text | Multi-source ingestion (T10) |
+| No agent integration | I never query the graph | Agent integration (T11) |
+
+#### Decisions
+- **Phase 1 = T6 (LLM extraction)**: Highest impact, fixes core quality problem
+- **Phase 2 = T11 (Agent integration)**: Makes system useful immediately
+- **Phase 3 = T7 (Vector search)**: Builds on quality entities from T6
+- **API vs Local**: Start with GPT-4o-mini ($0.0003/session), migrate to Ollama later
+- **SQLite retained**: WAL mode sufficient for current scale
+- **Embedding model**: all-MiniLM-L6-v2 (384-dim, 80MB, fast)
+
+#### New Tasks Created
+| ID | Title | Priority | Phase |
+|----|-------|----------|-------|
+| T6 | LLM-Based Entity Extraction | 🔴 HIGH | 1 |
+| T7 | Vector Embeddings + Semantic Search | 🔴 HIGH | 2 |
+| T8 | Background Processing Queue | 🟡 MEDIUM | 3 |
+| T9 | Temporal Decay + Relationship Strength | 🟡 MEDIUM | 4 |
+| T10 | Multi-Source Ingestion | 🔴 HIGH | 5 |
+| T11 | Agent Integration | 🔴 HIGH | 6 |

@@ -1,43 +1,31 @@
 # Edit History
 
-## 2026-06-18 18:50 UTC — T1/T2: Repo Creation
+## 2026-06-18 02:24 — T6: Architectural Review: Robust Memory System Design
+- [Created] `memory-bank/implementation-details/T6-architectural-plan.md` — Six-phase architectural improvement plan
+- [Created] `memory-bank/implementation-details/tiered-memory-graph.md` — Tiered memory graph architecture spec
+- [Modified] `memory-bank/tasks.md` — Added T6-T11 architectural improvement tasks
+- [Modified] `memory-bank/activeContext.md` — Updated with architectural review findings
+- [Modified] `memory-bank/systemPatterns.md` — Added tiered memory and LLM extraction patterns
 
-**Task**: T1, T2  
-**Description**: Created graph-memory repo, copied scripts, initialized DB memory bank, populated with existing context
+## 2026-06-18 19:04:00 — T1,T2: Completed memory-bank structure: added projectbrief.md, activeContext.md, progress.md, edit_history.md, session_cache.md, techContext.md, systemPatterns.md, and templates/
+- [create] `memory-bank/projectbrief.md` — Project goals and architecture
+- [create] `memory-bank/activeContext.md` — Current focus and open questions
+- [create] `memory-bank/progress.md` — Progress log with pre-history
+- [create] `memory-bank/edit_history.md` — Edit history for the repo setup
+- [create] `memory-bank/session_cache.md` — Session cache with task counts
+- [create] `memory-bank/techContext.md` — Technical context and stack
+- [create] `memory-bank/systemPatterns.md` — System patterns and design decisions
+- [create] `memory-bank/templates/` — Copied templates from workspace memory-bank
 
-### Files Created
-- `scripts/` — Copied from `.openclaw_memory/` (entity-extractor.cjs, knowledge-graph.cjs, build-graph.cjs, journal-writer.cjs, read-session.cjs, batch-process-all-sessions.sh)
-- `memory-bank/database/lib/` — Copied from workspace memory-bank (inserts.js, regenerate.js, sqlite.js, workflow.js, schema.sql)
-- `memory-bank/database/memory_bank.db` — Initialized with schema.sql
-- `projectbrief.md` — Project goals and architecture
-- `memory-bank/tasks.md` — Active tasks T1-T5
-- `memory-bank/tasks/T1.md` — Graph Update Automation task
-- `memory-bank/tasks/T2.md` — Session-Entity-Extractor task
-- `memory-bank/tasks/T3.md` — Memory Search Bridge task
-- `memory-bank/tasks/T4.md` — Entity Quality Improvements task
-- `memory-bank/tasks/T5.md` — Historical Backfill task
+## 2026-06-18 18:50:00 — T1,T2: Created graph-memory repo. Copied existing scripts from .openclaw_memory. Initialized DB memory bank. Populated with existing context.
 
-### DB Operations
-- Inserted 5 tasks into `task_items`
-- Inserted 1 edit entry into `edit_entries`
-- Inserted 4 file modifications into `file_modifications`
-- Inserted 1 session into `sessions`
-- Updated `session_cache` with 2 active, 0 paused, 0 completed
+## 2026-06-18 18:50:00 — T1,T2: Created graph-memory repo. Copied existing scripts from .openclaw_memory. Initialized DB memory bank. Populated with existing context.
+- [create] `scripts/` — Copied entity-extractor.cjs, knowledge-graph.cjs, build-graph.cjs, journal-writer.cjs, read-session.cjs, batch-process-all-sessions.sh from .openclaw_memory
+- [create] `memory-bank/database/lib/` — Copied inserts.js, regenerate.js, sqlite.js, workflow.js, schema.sql from workspace memory-bank
+- [create] `projectbrief.md` — Project brief documenting graph memory system goals
+- [create] `memory-bank/tasks.md` — Active tasks: T1-T5 for graph system improvement
+- [create] `scripts/` — Copied entity-extractor.cjs, knowledge-graph.cjs, build-graph.cjs, journal-writer.cjs, read-session.cjs, batch-process-all-sessions.sh from .openclaw_memory
+- [create] `memory-bank/database/lib/` — Copied inserts.js, regenerate.js, sqlite.js, workflow.js, schema.sql from workspace memory-bank
+- [create] `projectbrief.md` — Project brief documenting graph memory system goals
+- [create] `memory-bank/tasks.md` — Active tasks: T1-T5 for graph system improvement
 
-## 2026-06-18 18:54 UTC — Public Repo Preparation
-
-**Task**: T1  
-**Description**: Scrubbed personal information for public GitHub release
-
-### Files Modified
-- `scripts/entity-extractor.cjs` — Replaced all real names with generic placeholders
-- `scripts/entity-extractor.cjs` — Replaced institution names with generic placeholders
-- `scripts/entity-extractor.cjs` — Replaced research area aliases with generic placeholders
-- `scripts/build-graph.cjs` — Changed title from "Cloudy" to generic "Knowledge Graph"
-- `scripts/knowledge-graph.cjs` — Changed titles to generic "Agent Memory"
-- `README.md` — Removed personal references
-- `memory-bank/database/lib/regenerate.js` — Changed header from "Sage Workspace" to "Graph Memory System"
-- Git config: Changed author to `Graph Memory System <graph-memory@example.com>`
-
-### Pushed
-- `https://github.com/space-cadet/graph-memory` — Public repository
