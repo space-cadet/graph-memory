@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Generated / Database
+graph/graph.db
+graph/*.db
+memory-bank/database/*.db
+memory-bank/*.db
+*.db
+
+# Generated visualization
+graph/knowledge-graph.html
+graph/*.html
+graph/*.json
+graph/*.gexf
+graph/*.dot
+
+# Watermark / Cache
+.watermark
+.cache/
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
