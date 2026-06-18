@@ -121,7 +121,7 @@ function generateHTMLViz() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Knowledge Graph — Cloudy</title>
+  <title>Knowledge Graph</title>
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -303,6 +303,6 @@ console.log("\n✅ Graph build complete!");
 console.log(`Database: ${DB_PATH}`);
 console.log(`\nQuery commands:`);
 console.log(`  node scripts/knowledge-graph.cjs stats`);
-console.log(`  node scripts/knowledge-graph.cjs query "Deepak Vaid"`);
+console.log(`  node scripts/knowledge-graph.cjs query "User Name"`);
 console.log(`  node scripts/knowledge-graph.cjs search "quantum"`);
 console.log(`  node scripts/knowledge-graph.cjs export --format gexf`);

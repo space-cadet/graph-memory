@@ -58,41 +58,26 @@ try {
 
 /* ── Entity canonicalization ─────────────────── */
 const NAME_ALIASES = {
-  // Deepak variants
-  "deepak": "Deepak Vaid",
-  "deepak vaid": "Deepak Vaid",
-  "d.vaid": "Deepak Vaid",
-  "d. vaid": "Deepak Vaid",
-  "vaid": "Deepak Vaid",
-  "明达": "Deepak Vaid",
-  // Sage variants
-  "sage": "Sage",
-  // Cloudy variants
-  "cloudy": "Cloudy",
-  "云忆": "Cloudy",
-  // Institutions
-  "penn state": "Pennsylvania State University",
-  "psu": "Pennsylvania State University",
-  "nitk": "NITK Karnataka",
-  "iucaa": "IUCAA Pune",
-  // Advisors/collaborators
-  "bojowald": "Martin Bojowald",
-  "martin bojowald": "Martin Bojowald",
-  "alexander": "Stephon Alexander",
-  "stephon alexander": "Stephon Alexander",
-  "ashtekar": "Abhay Ashtekar",
-  "bilson-thompson": "Sundance Bilson-Thompson",
-  "sundance": "Sundance Bilson-Thompson",
-  // Research areas
-  "lqg": "Loop Quantum Gravity",
-  "loop quantum gravity": "Loop Quantum Gravity",
-  "string theory": "String Theory",
-  "qhe": "Quantum Hall Effect",
-  "quantum hall effect": "Quantum Hall Effect",
-  "bhe": "Black Hole Entropy",
-  "black hole entropy": "Black Hole Entropy",
-  "tqc": "Topological Quantum Computation",
-  "topological quantum computation": "Topological Quantum Computation",
+  // Person variants (replace with your own aliases)
+  "user": "User Name",
+  "user name": "User Name",
+  "u.name": "User Name",
+  "u. name": "User Name",
+  "name": "User Name",
+  // Agent variants
+  "agent": "Agent Name",
+  "agent name": "Agent Name",
+  // Institutions (replace with your own)
+  "institution1": "Institution One",
+  "institution2": "Institution Two",
+  // Advisors/collaborators (replace with your own)
+  "advisor1": "Advisor One",
+  "advisor2": "Advisor Two",
+  "collaborator1": "Collaborator One",
+  "collaborator2": "Collaborator Two",
+  // Research areas (replace with your own)
+  "research_area1": "Research Area One",
+  "research_area2": "Research Area Two",
 };
 
 function canonicalizeName(name) {
@@ -173,7 +158,7 @@ const PATTERNS = {
   concept: /(?:thinking|thought|idea|concept|pattern|convention|protocol)\s*(?::|——|→)\s*([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)+)/g,
 
   // People: known names + "X said/suggests" patterns
-  person: /\b(Deepak|Sage|Cloudy|Ember|Claude|GPT|Kimi|Deepak Vaid|Martin Bojowald|Stephon Alexander|Abhay Ashtekar|Sundance Bilson-Thompson|Bilson-Thompson|Etera Livine|Jainendra Jain|Schmidhuber|Wolfram|Zuse)\b/g,
+  person: /\b(User|Agent|Alice|Bob|Charlie|User Name|Agent Name|Collaborator One|Advisor One|Advisor Two)\b/g,
 
   // Institutions
   institution: /\b(Pennsylvania State University|Penn State|PSU|NITK|IIT|IUCAA|Perimeter Institute|ICGC)\b/gi,
@@ -377,7 +362,7 @@ function guessEntityType(name) {
   if (/\.(md|ts|tsx|js|json|py)$/.test(name)) return "file";
   if (/^(npm|pnpm|yarn|git|curl|node|docker|vercel|supabase|clerk)$/.test(name)) return "tool";
   if (name.includes(" ") && name[0] === name[0].toUpperCase()) return "concept";
-  if (/^(Deepak|Sage|Cloudy|Ember|Deepak Vaid|Martin Bojowald|Stephon Alexander|Abhay Ashtekar|Sundance Bilson-Thompson)$/.test(name)) return "person";
+  if (/^(User|Agent|Alice|Bob|Charlie|User Name|Agent Name|Collaborator One|Advisor One|Advisor Two)$/.test(name)) return "person";
   return "concept";
 }
 

@@ -7,7 +7,7 @@
  *
  * Usage:
  *   node knowledge-graph.js query "ts-quantum"          # find entity + neighbors
- *   node knowledge-graph.js path "Deepak" "ts-quantum"   # shortest path
+ *   node knowledge-graph.js path "User" "ts-quantum"   # shortest path
  *   node knowledge-graph.js related "clerk"             # entities related to clerk
  *   node knowledge-graph.js stats                       # graph statistics
  *   node knowledge-graph.js export --format json|dot|gexf  # export graph
@@ -190,7 +190,7 @@ class KnowledgeGraph {
     let gexf = `<?xml version="1.0" encoding="UTF-8"?>
 <gexf xmlns="http://www.gexf.net/1.3" version="1.3">
   <meta lastmodifieddate="${new Date().toISOString().split("T")[0]}">
-    <creator>Cloudy Knowledge Graph</creator>
+    <creator>Knowledge Graph System</creator>
     <description>Entity-relationship graph from journal files</description>
   </meta>
   <graph mode="static" defaultedgetype="directed">
@@ -254,7 +254,7 @@ class KnowledgeGraph {
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Knowledge Graph — Cloudy's Memory</title>
+  <title>Knowledge Graph — Agent Memory</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
   <style>
     body { margin: 0; font-family: -apple-system, sans-serif; background: #1a1a2e; }
@@ -513,9 +513,9 @@ Commands:
   visualize                 Generate HTML visualization
 
 Examples:
-  node knowledge-graph.js query "Deepak Vaid"
+  node knowledge-graph.js query "User Name"
   node knowledge-graph.js search "quantum"
-  node knowledge-graph.js path "Deepak" "Loop Quantum Gravity"
+  node knowledge-graph.js path "User" "Research Area One"
   node knowledge-graph.js export --format gexf
   node knowledge-graph.js visualize
 `);
