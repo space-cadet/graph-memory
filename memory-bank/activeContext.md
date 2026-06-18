@@ -1,27 +1,42 @@
 # Active Context
 
+*Last Updated: 2026-06-18 19:30 UTC*
+
 ## Current Focus
 
-**T2: Session-Entity-Extractor (Direct JSONL)** — In Progress
+**T1: Graph Update Automation** — In Progress
 
-Building the direct JSONL extractor that reads full conversation text instead of truncated journal summaries. This is the foundation for all other tasks.
+Integrating `session-entity-extractor.cjs` into the heartbeat rotation. T2 is now complete.
 
 ## Recent Decisions
 
-- **Repo created**: `graph-memory` in `code/` with DB-native memory bank
-- **Public GitHub repo**: `space-cadet/graph-memory` with personal info scrubbed
-- **Update cadence**: Every 2nd heartbeat (~1 hour) alongside journal processing
-- **Extraction strategy**: Direct JSONL, not journal-based (validated by search tests)
+- **T2 COMPLETE**: `session-entity-extractor.cjs` built and validated
+- **Direct JSONL extraction confirmed**: Search quality dramatically improved
+- **chimera found**: 0 → 1 (journal vs session extraction)
+- **arXiv found**: 1-2 → 20 results
+- **Watermark system**: `.session-watermark.json` tracks incremental progress
 
-## Open Questions
+## Completed Tasks
+- ✅ T2: Session-Entity-Extractor (Direct JSONL) — COMPLETE
 
-1. How to handle incremental builds efficiently (watermark vs. full rebuild)
-2. Whether to store conversation snippets in relationships table or a new table
-3. How to weight entity types for search relevance (files vs. concepts vs. decisions)
+## Active Tasks
+| ID | Title | Status | Priority |
+|----|-------|--------|----------|
+| T1 | Graph Update Automation | in_progress | HIGH |
+
+## Pending Tasks
+| ID | Title | Status | Priority |
+|----|-------|--------|----------|
+| T3 | Memory Search Bridge | pending | HIGH |
+| T4 | Entity Quality Improvements | pending | MEDIUM |
+| T5 | Historical Backfill | pending | LOW |
 
 ## Next Actions
+1. Add graph build step to heartbeat rotation (T1)
+2. Test incremental mode on heartbeat
+3. Build search bridge (T3)
 
-1. Build `session-entity-extractor.cjs` (T2)
-2. Test on a single recent session
-3. Add to heartbeat rotation (T1)
-4. Build search bridge (T3)
+## Open Questions
+1. Should the extractor run on EVERY heartbeat or every 2nd?
+2. How to handle the large backfill (13,702 files) without blocking heartbeat?
+3. Search bridge: CLI tool vs. agent integration via function call?
