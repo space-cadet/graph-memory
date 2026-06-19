@@ -1,5 +1,11 @@
 # Edit History
 
+## 2026-06-19 08:12:00 — T1: Initialized .openclaw_memory and ran extraction tests
+- [Copied] `.openclaw_memory/scripts/session-entity-extractor.cjs` — Updated extractor from repo
+- [Copied] `.openclaw_memory/scripts/knowledge-graph.cjs` — Updated query tool from repo
+- [Ran] `.openclaw_memory/graph.db` — Processed 82 sessions, added 84 entities, 308 relationships
+- [Validated] `.openclaw_memory/graph.db` — Confirmed quantum→0, memory→3 results (regex extraction limited)
+
 ## 2026-06-18 02:24 — T6: Architectural Review: Robust Memory System Design
 - [Created] `memory-bank/implementation-details/T6-architectural-plan.md` — Six-phase architectural improvement plan
 - [Created] `memory-bank/implementation-details/tiered-memory-graph.md` — Tiered memory graph architecture spec

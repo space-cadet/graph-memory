@@ -1,5 +1,38 @@
 # Progress Log
 
+## 2026-06-19 — T1: Graph Initialization and Extraction Testing
+
+### Session: Morning (08:12 IST)
+- **Focus**: T1 — Initialize .openclaw_memory with new repo code, test extraction
+- **Status**: Testing complete, validation confirms architectural plan
+
+#### Completed
+- ✅ Copied new repo scripts to `.openclaw_memory/scripts/` (session-entity-extractor.cjs, knowledge-graph.cjs, build-graph.cjs)
+- ✅ Ran session-entity-extractor on 82 new sessions (incremental, watermark-based)
+- ✅ **84 entities, 308 relationships** extracted from 82 sessions
+- ✅ Graph stats: 154 entities, 3,668 relationships total
+- ✅ Validated search quality: "quantum" → 0, "memory" → 3, "chimera" → 0
+- ✅ Confirmed regex extraction still missing ~90% of meaningful content
+- ✅ Updated memory-bank DB with edit entry and file modifications
+- ✅ Regenerated edit_history.md
+
+#### Validation Results
+| Query | Results | Assessment |
+|-------|---------|------------|
+| "quantum" | 0 | ❌ Still missing — confirms need for T6 (LLM extraction) |
+| "memory" | 3 | ✅ Basic file/project matches work |
+| "chimera" | 0 | ❌ Missed — regex can't catch project names without explicit patterns |
+| "obsidian" | 0 | ❌ Missed — tool name not in pattern list |
+
+#### Key Insight
+Regex-based extraction successfully finds files, tools (npm, git, node), and explicit `[[links]]`, but completely misses:
+- Domain concepts (quantum, gravity, spin networks)
+- Project names without explicit paths (chimera-chat)
+- Tools not in hardcoded list (obsidian, vite, tsc)
+- People, institutions, papers unless explicitly patterned
+
+This validates the architectural decision to move to LLM-based extraction (T6) as Phase 1.
+
 ## 2026-06-18 — T2 Complete: Session-Entity-Extractor
 
 ### Session: Evening (19:22-19:30 UTC)
