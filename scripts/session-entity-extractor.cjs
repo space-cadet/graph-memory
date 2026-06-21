@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 /**
- * session-entity-extractor.js
+ * session-entity-extractor.js  (v2 — Protocol-Aware)
  * ─────────────────────────────────────────────
  * Extracts entities and relationships from raw OpenClaw session JSONL files.
  * Reads FULL conversation text (not truncated journal summaries).
+ *
+ * v2 adds memory-bank protocol extraction:
+ *   - Task lifecycle (T19, T20…) with status, blockers, next actions
+ *   - Edit chunk detection (edits/YYYY-MM-DD/…)
+ *   - Decisions and protocol actions
  *
  * Usage:
  *   node session-entity-extractor.js                    # process all new sessions
@@ -157,6 +162,7 @@ function saveWatermark(watermark) {
 
 /* ── Entity extraction patterns ──────────────── */
 const PATTERNS = {
+  // --- Standard entities ---
   explicitLink: /\[\[([^\]]+)\]\]/g,
   projectPath: /(?:~\/code\/|src\/|workspace\/|projects\/)([a-zA-Z][a-zA-Z0-9_-]*)/g,
   tool: /\b(?:npm|pnpm|yarn|npx|git|curl|node|python|docker|vercel|supabase|clerk|esbuild|vite|tsc|playwright|qiskit|qutip|julia|sagemath|pytorch)\b/gi,
@@ -169,6 +175,16 @@ const PATTERNS = {
   error: /Error:\s*([^\n]+)|Failed to\s+([^\n]+)/g,
   githubRepo: /github\.com\/[^\/\s]+\/([a-zA-Z0-9_-]+)/g,
   url: /https?:\/\/([^\s]+)/g,
+
+  // --- Memory-bank protocol entities ---
+  taskRef: /\b(T\d{1,3})\b/g,
+  taskStatus: /\b(T\d{1,3})\b.*?\b(?:is\s+)?(blocked|in_progress|in progress|completed|complete|pending|paused|done)\b/gi,
+  blockerPhrase: /(?:blocker|blocked because|blocked on|waiting on|stuck on)\s*:?\s*([^\n]+)/gi,
+  nextAction: /(?:next action|next step|need to|TODO:|todo:)\s*:?\s*([^\n]+)/gi,
+  editChunk: /edits\/(\d{4}-\d{2}-\d{2})\/([\w-]+\.md)/g,
+  editChunkCreate: /(?:created|wrote)\s+(?:an?\s+)?edit\s*chunk\s+(?:in\s+)?(?:edits\/)?(\d{4}-\d{2}-\d{2})?\/?([\w-]+\.md)?/gi,
+  decision: /(?:decision|decided|agreed|concluded)\s*:?\s*([^\n]+)/gi,
+  fileChange: /\b(write|edit|create|delete)\b\s+(?:file\s+)?[`\"']?([a-zA-Z0-9_\-\/]+\.(?:ts|tsx|js|jsx|json|py|md|sh|yml|yaml|css|html))[`\"']?/gi,
 };
 
 /* ── Extract text from JSONL content ─────────── */
@@ -192,7 +208,163 @@ function extractThinking(content) {
     .join("\n");
 }
 
-/* ── Extract entities from text ─────────────── */
+/* ── Extract protocol entities from text ─────── */
+function extractProtocolEntities(text, sessionDate) {
+  const entities = new Map();
+  const relationships = [];
+  let match;
+
+  // --- Task references (T19, T20, etc.) ---
+  PATTERNS.taskRef.lastIndex = 0;
+  while ((match = PATTERNS.taskRef.exec(text)) !== null) {
+    const taskName = match[1].toUpperCase();
+    addEntity(entities, taskName, "task");
+  }
+
+  // --- Task status transitions ---
+  PATTERNS.taskStatus.lastIndex = 0;
+  while ((match = PATTERNS.taskStatus.exec(text)) !== null) {
+    const taskName = match[1].toUpperCase();
+    const status = match[2].toLowerCase().replace(/\s+/g, "_");
+    addEntity(entities, taskName, "task");
+    relationships.push({
+      source: taskName,
+      target: `status:${status}`,
+      type: "task_has_status",
+      context: match[0]
+    });
+  }
+
+  // --- Blockers ---
+  PATTERNS.blockerPhrase.lastIndex = 0;
+  while ((match = PATTERNS.blockerPhrase.exec(text)) !== null) {
+    const blockerText = match[1].trim();
+    if (blockerText.length > 5) {
+      const blockerId = `blocker:${blockerText.slice(0, 80)}`;
+      addEntity(entities, blockerId, "blocker");
+      relationships.push({
+        source: blockerId,
+        target: `session:${sessionDate}`,
+        type: "blocker_found_in_session",
+        context: blockerText
+      });
+
+      // Link blocker to any task mentioned nearby (within 200 chars)
+      const nearbyText = text.slice(Math.max(0, match.index - 200), match.index + 200);
+      const nearbyTasks = [...nearbyText.matchAll(/\b(T\d{1,3})\b/g)].map(m => m[1].toUpperCase());
+      for (const task of new Set(nearbyTasks)) {
+        relationships.push({
+          source: task,
+          target: blockerId,
+          type: "task_blocked_by",
+          context: blockerText
+        });
+      }
+    }
+  }
+
+  // --- Next actions ---
+  PATTERNS.nextAction.lastIndex = 0;
+  while ((match = PATTERNS.nextAction.exec(text)) !== null) {
+    const actionText = match[1].trim();
+    if (actionText.length > 5) {
+      const actionId = `next:${actionText.slice(0, 80)}`;
+      addEntity(entities, actionId, "next_action");
+      relationships.push({
+        source: actionId,
+        target: `session:${sessionDate}`,
+        type: "next_action_in_session",
+        context: actionText
+      });
+
+      // Link next action to nearby tasks
+      const nearbyText = text.slice(Math.max(0, match.index - 200), match.index + 200);
+      const nearbyTasks = [...nearbyText.matchAll(/\b(T\d{1,3})\b/g)].map(m => m[1].toUpperCase());
+      for (const task of new Set(nearbyTasks)) {
+        relationships.push({
+          source: task,
+          target: actionId,
+          type: "task_next_action",
+          context: actionText
+        });
+      }
+    }
+  }
+
+  // --- Edit chunks ---
+  PATTERNS.editChunk.lastIndex = 0;
+  while ((match = PATTERNS.editChunk.exec(text)) !== null) {
+    const date = match[1];
+    const filename = match[2];
+    const chunkId = `edit:${date}/${filename}`;
+    addEntity(entities, chunkId, "edit_chunk");
+    relationships.push({
+      source: chunkId,
+      target: `session:${sessionDate}`,
+      type: "edit_chunk_in_session",
+      context: null
+    });
+
+    // Link to nearby tasks
+    const nearbyText = text.slice(Math.max(0, match.index - 300), match.index + 300);
+    const nearbyTasks = [...nearbyText.matchAll(/\b(T\d{1,3})\b/g)].map(m => m[1].toUpperCase());
+    for (const task of new Set(nearbyTasks)) {
+      relationships.push({
+        source: chunkId,
+        target: task,
+        type: "edit_chunk_for_task",
+        context: null
+      });
+    }
+  }
+
+  // --- Decisions ---
+  PATTERNS.decision.lastIndex = 0;
+  while ((match = PATTERNS.decision.exec(text)) !== null) {
+    const decisionText = match[1].trim();
+    if (decisionText.length > 10) {
+      const decisionId = `decision:${decisionText.slice(0, 100)}`;
+      addEntity(entities, decisionId, "decision");
+      relationships.push({
+        source: decisionId,
+        target: `session:${sessionDate}`,
+        type: "decision_made_in_session",
+        context: decisionText
+      });
+    }
+  }
+
+  // --- File changes from tool calls ---
+  PATTERNS.fileChange.lastIndex = 0;
+  while ((match = PATTERNS.fileChange.exec(text)) !== null) {
+    const operation = match[1].toLowerCase();
+    const filepath = match[2];
+    const changeId = `change:${operation}:${filepath}`;
+    addEntity(entities, changeId, "file_change");
+    relationships.push({
+      source: changeId,
+      target: `session:${sessionDate}`,
+      type: "file_changed_in_session",
+      context: `${operation} ${filepath}`
+    });
+
+    // Link to nearby tasks
+    const nearbyText = text.slice(Math.max(0, match.index - 300), match.index + 300);
+    const nearbyTasks = [...nearbyText.matchAll(/\b(T\d{1,3})\b/g)].map(m => m[1].toUpperCase());
+    for (const task of new Set(nearbyTasks)) {
+      relationships.push({
+        source: changeId,
+        target: task,
+        type: "file_change_for_task",
+        context: null
+      });
+    }
+  }
+
+  return { entities, relationships };
+}
+
+/* ── Extract standard entities from text ─────── */
 function extractEntities(text, sessionDate) {
   const entities = new Map();
   const relationships = [];
@@ -446,12 +618,32 @@ function processSessionFile(sessionPath) {
     return { entities: 0, relationships: 0, sessionDate };
   }
 
+  // Extract standard entities
   const { entities, relationships } = extractEntities(allText, sessionDate);
+
+  // Extract protocol entities
+  const { entities: protoEntities, relationships: protoRelationships } = extractProtocolEntities(allText, sessionDate);
+
+  // Merge protocol entities into main entities map
+  for (const [key, info] of protoEntities) {
+    if (entities.has(key)) {
+      entities.get(key).count += info.count;
+    } else {
+      entities.set(key, info);
+    }
+  }
+  relationships.push(...protoRelationships);
 
   if (dryRun) {
     console.log(`\n=== ${basename} ===`);
     console.log(`Text length: ${allText.length} chars`);
     console.log(`Entities found: ${entities.size}`);
+    const taskEntities = Array.from(entities.values()).filter(e => e.type === "task");
+    const editChunks = Array.from(entities.values()).filter(e => e.type === "edit_chunk");
+    const decisions = Array.from(entities.values()).filter(e => e.type === "decision");
+    if (taskEntities.length) console.log(`  Tasks: ${taskEntities.map(e => e.name).join(", ")}`);
+    if (editChunks.length) console.log(`  Edit chunks: ${editChunks.length}`);
+    if (decisions.length) console.log(`  Decisions: ${decisions.length}`);
     for (const [key, info] of entities) {
       console.log(`  [${info.type}] ${info.name} (${info.count}x)`);
     }

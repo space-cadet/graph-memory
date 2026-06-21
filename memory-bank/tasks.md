@@ -66,3 +66,10 @@
 - Started: 2026-06-18T20:54:12.694Z
 - Details: Add confidence and strength fields to relationships. Implement temporal decay: relationships fade if not reinforced. Phase 4 of architectural plan.
 
+
+## T12: Memory-Bank Protocol Extraction
+- Status: ✅ **completed**
+- Priority: 🔴 high
+- Started: 2026-06-22
+- Completed: 2026-06-22
+- Details: Extended session-entity-extractor.cjs to understand memory-bank protocol v6.12. Added task, edit_chunk, decision, blocker, next_action, file_change entity types. Created memory-bank-reconstructor.cjs that queries graph and outputs memory-bank markdown. Reconstructed 5 days (2026-06-17 through 2026-06-21) after workspace git reset. Graph: 968 sessions → 1,159 entities → 8,392 relationships.

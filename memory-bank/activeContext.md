@@ -1,56 +1,52 @@
 # Active Context
 
-*Last Updated: 2026-06-19 08:30 IST*
+*Last Updated: 2026-06-22 04:45 IST*
 
 ## Current Focus
 
-**T1: Graph Update Automation — Testing Complete, Validated Architectural Plan**
+**T12: Memory-Bank Protocol Extraction — ✅ COMPLETED**
 
-Initialized `.openclaw_memory` with new repo code and ran extraction tests on 82 sessions. Results confirm the architectural assessment: regex extraction captures only ~10% of meaningful content.
-
-## Test Results Summary
-| Query | Results | Meaning |
-|-------|---------|---------|
-| "quantum" | 0 | Misses domain concepts entirely |
-| "memory" | 3 | Files/projects with explicit patterns work |
-| "chimera" | 0 | Misses project names without paths |
-| "obsidian" | 0 | Misses tools not in hardcoded list |
-
-**Conclusion:** The six-phase architectural plan (T6-T11) is validated. LLM-based extraction (T6) is indeed the highest-impact first step.
+Protocol-aware extraction implemented and tested. Successfully reconstructed memory-bank files for missing dates (2026-06-17 through 2026-06-21).
 
 ## Completed Tasks
 | ID | Title | Status |
 |----|-------|--------|
 | T2 | Session-Entity-Extractor (Direct JSONL) | ✅ completed |
+| T12 | Memory-Bank Protocol Extraction | ✅ completed |
 
 ## Active Tasks
 | ID | Title | Status | Priority |
 |----|-------|--------|----------|
 | T1 | Graph Update Automation | in_progress | high |
-| T6 | LLM-Based Entity Extraction | pending | high |
 
-## Pending Tasks (Architectural Plan)
-| ID | Title | Status | Priority | Phase |
-|----|-------|--------|----------|-------|
-| T11 | Agent Integration | pending | high | 2 |
-| T7 | Vector Embeddings + Semantic Search | pending | high | 3 |
-| T8 | Background Processing Queue | pending | medium | 4 |
-| T9 | Temporal Decay + Relationship Strength | pending | medium | 5 |
-| T10 | Multi-Source Ingestion | pending | high | 6 |
-
-## Original Pending Tasks
+## Pending Tasks
 | ID | Title | Status | Priority |
 |----|-------|--------|----------|
 | T3 | Memory Search Bridge | pending | high |
 | T4 | Entity Quality Improvements | pending | medium |
 | T5 | Historical Backfill | pending | low |
+| T6 | LLM-Based Entity Extraction | pending | high |
+| T7 | Vector Embeddings + Semantic Search | pending | high |
+| T8 | Background Processing Queue | pending | medium |
+| T9 | Temporal Decay + Relationship Strength | pending | medium |
+| T10 | Multi-Source Ingestion | pending | high |
+| T11 | Agent Integration | pending | high |
 
 ## Next Actions
-1. **Implement T6: LLM-based entity extraction** — validated as highest impact
-2. Design extraction prompt template for session content
-3. Test on 10-session batch with GPT-4o-mini
-4. Evaluate cost/quality tradeoff vs local model
+1. **T13: Graph-Memory Integration** — Integrate graph queries into Sage's core memory recovery
+2. **Improve reconstruction quality** — Better blocker/decision filtering to reduce noise
+3. **T3: Memory Search Bridge** — Connect graph queries to Sage's memory_search tool
+
+## T12 Results
+- **Schema extended**: Added `task`, `edit_chunk`, `decision`, `blocker`, `next_action`, `file_change` entity types
+- **New relationships**: `task_has_status`, `task_blocked_by`, `task_next_action`, `edit_chunk_for_task`, `decision_made_in_session`, `file_changed_in_session`
+- **Files created**:
+  - `scripts/session-entity-extractor.cjs` (v2 — protocol-aware)
+  - `scripts/memory-bank-reconstructor.cjs` (new)
+- **Reconstruction output**: `memory-bank/reconstructed/2026-06-17..21/`
+  - Daily `tasks.md`, `activeContext.md`, `edit_history.md`, `session_cache.md`
 
 ## Architecture Docs
 - `implementation-details/T6-architectural-plan.md` — Six-phase plan
 - `implementation-details/tiered-memory-graph.md` — Tiered architecture spec
+- `memory-bank/tasks/T12.md` — Memory-bank protocol extraction task
