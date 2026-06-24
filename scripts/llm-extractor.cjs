@@ -207,7 +207,7 @@ async function extractChunk(chunk, options = {}) {
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: chunk },
     ],
-    ...(model.includes('gpt-4o') || model.includes('openai')
+    ...(baseURL.includes('openai.com') || baseURL.includes('openrouter.ai')
       ? { response_format: { type: 'json_object' } }
       : {}),
   };

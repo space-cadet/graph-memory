@@ -44,6 +44,51 @@ graph-memory/
 - **Missing**: No automation (graph is stale), no search bridge
 - **Tasks**: T1-T5 defined in `memory-bank/tasks.md`
 
+## LLM Extraction Configuration
+
+The `session-entity-extractor.cjs` now uses LLM-based extraction as the primary method, with regex fallback.
+
+### Cloud API (default via OpenRouter)
+
+```bash
+export OPENROUTER_API_KEY="sk-or-v1-..."
+export LLM_MODEL="openai/gpt-4o-mini"
+export LLM_BASE_URL="https://openrouter.ai/api"
+node scripts/session-entity-extractor.cjs
+```
+
+### Local Model (Ollama)
+
+1. Install Ollama: https://ollama.com
+2. Pull a model: `ollama pull llama3.2`
+3. Run with local config:
+
+```bash
+export LLM_BASE_URL="http://localhost:11434/v1"
+export LLM_MODEL="llama3.2"
+# No API key needed for local Ollama
+node scripts/session-entity-extractor.cjs
+```
+
+**Note**: Ollama must be running (`ollama serve`). The `/v1` path uses OpenAI-compatible mode. If your Ollama version doesn't support this, upgrade to v0.2.0+.
+
+### Other OpenAI-Compatible APIs
+
+Any provider with an OpenAI-compatible `/chat/completions` endpoint works:
+
+```bash
+export LLM_BASE_URL="https://api.your-provider.com/v1"
+export LLM_API_KEY="your-key"
+export LLM_MODEL="your-model-name"
+```
+
+Environment variables used by `llm-extractor.cjs`:
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENROUTER_API_KEY` | — | API key (falls back to `OPENAI_API_KEY`, `KIMI_API_KEY`) |
+| `LLM_BASE_URL` | `https://openrouter.ai/api` | API base URL |
+| `LLM_MODEL` | `openai/gpt-4o-mini` | Model identifier |
+
 ## Quick Start
 
 ```bash
@@ -63,9 +108,9 @@ node scripts/build-graph.cjs --visualize
 | ID | Task | Status |
 |----|------|--------|
 | T1 | Graph Update Automation | 🔄 in_progress |
-| T2 | Session-Entity-Extractor (Direct JSONL) | 🔄 in_progress |
+| T2 | Session-Entity-Extractor (Direct JSONL) | ✅ done |
 | T3 | Memory Search Bridge | ⏳ pending |
-| T4 | Entity Quality Improvements | ⏳ pending |
+| T4 | Entity Quality Improvements (LLM extraction) | ✅ done |
 | T5 | Historical Backfill | ⏳ pending |
 
 ## Origin
