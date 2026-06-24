@@ -35,3 +35,24 @@
 - [create] `projectbrief.md` — Project brief documenting graph memory system goals
 - [create] `memory-bank/tasks.md` — Active tasks: T1-T5 for graph system improvement
 
+
+## 2026-06-24
+
+#### 07:30 IST - T3: Memory Search Bridge
+- Created `scripts/search-graph.cjs` — CLI wrapper for graph search: exact match, fuzzy match (Levenshtein), neighbor enrichment, structured summaries
+- Usage: `node search-graph.cjs "query"` — returns entity matches, neighbors, relationship paths, recent sessions, related entities
+- Committed and pushed to `main`
+
+#### 07:15 IST - T4: Temporal Decay + Relationship Strength
+- Modified `scripts/knowledge-graph.cjs` — Added `confidence` and `strength` columns to `relationships` table
+- Created `scripts/temporal-decay.cjs` — Batch processor (50K rows/batch) recalculates strength based on confidence × temporal decay (30-day half-life)
+- Updated `getNeighbors()` to filter by `minStrength` and order by `strength DESC`
+- Processed 110,794 relationships. Committed and pushed to `main`
+
+#### 07:00 IST - T4: Entity Quality Improvements
+- Modified `scripts/entity-extractor.cjs` — Added `decision`, `topic`, `question` entity types with regex patterns
+- Added `extractContext()` helper for relationship context extraction (80-char window around entity)
+- Co-occurrence relationships now include contextual snippets instead of null
+- Updated `guessEntityType()` to detect new types
+- Committed and pushed to `main`
+
