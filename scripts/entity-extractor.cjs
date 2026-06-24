@@ -95,7 +95,11 @@ function ensureSchema() {
       first_seen TEXT NOT NULL,
       last_seen TEXT NOT NULL,
       mention_count INTEGER DEFAULT 1,
-      entity_type TEXT
+      entity_type TEXT,
+      confidence REAL,
+      description TEXT,
+      strength REAL,
+      context TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
     CREATE INDEX IF NOT EXISTS idx_entities_canonical ON entities(canonical_name);
@@ -432,8 +436,8 @@ function upsertEntity(name, canonicalName, type, date) {
   if (dryRun) return;
 
   const stmt = `
-    INSERT INTO entities (name, canonical_name, first_seen, last_seen, mention_count, entity_type)
-    VALUES (?, ?, ?, ?, 1, ?)
+    INSERT INTO entities (name, canonical_name, first_seen, last_seen, mention_count, entity_type, confidence, description, strength, context)
+    VALUES (?, ?, ?, ?, 1, ?, NULL, NULL, NULL, NULL)
     ON CONFLICT(name) DO UPDATE SET
       last_seen = ?,
       mention_count = mention_count + 1
