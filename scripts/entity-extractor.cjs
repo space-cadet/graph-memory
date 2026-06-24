@@ -154,6 +154,15 @@ const PATTERNS = {
   // Files: *.md, *.ts, *.tsx, *.js, *.json
   file: /\b([A-Z][a-zA-Z]*\.md|[a-z][a-z0-9_-]*\.(?:ts|tsx|js|jsx|json|py|sh|yml|yaml|css|html))\b/g,
 
+  // Decisions: "decided to X", "agreed on X", "chose X", "opted for X"
+  decision: /(?:decided to|agreed on|chose|opted for|settled on|committed to|voted for|approved)\s+([a-z][a-z0-9_\s-]{3,40})/gi,
+
+  // Topics: "topic: X", "about X", "regarding X", "on the subject of X"
+  topic: /(?:topic|subject|theme|area|field)\s*(?::|——|→|of)\s*([A-Z][a-zA-Z]*(?:\s+[a-zA-Z]+){0,5})/gi,
+
+  // Questions: "question: X", "asked X", "wondered X", "how to X", "why X"
+  question: /(?:question|asked|wondered|how to|why|what if|should we|can we|will we)\s*[:]?\s*([A-Z][a-zA-Z]*(?:\s+[a-zA-Z]+){0,8}[?]?)/gi,
+
   // Concepts: Capitalized multi-word phrases in thinking blocks
   concept: /(?:thinking|thought|idea|concept|pattern|convention|protocol)\s*(?::|——|→)\s*([A-Z][a-zA-Z]*(?:\s+[A-Z][a-zA-Z]*)+)/g,
 
@@ -218,6 +227,33 @@ function extractEntities(text, sessionDate) {
   while ((match = PATTERNS.file.exec(text)) !== null) {
     const name = match[1];
     addEntity(entities, name, "file");
+  }
+
+  // Decisions
+  PATTERNS.decision.lastIndex = 0;
+  while ((match = PATTERNS.decision.exec(text)) !== null) {
+    const name = match[1].trim();
+    if (name.length > 3 && !isCommonWord(name)) {
+      addEntity(entities, name, "decision");
+    }
+  }
+
+  // Topics
+  PATTERNS.topic.lastIndex = 0;
+  while ((match = PATTERNS.topic.exec(text)) !== null) {
+    const name = match[1].trim();
+    if (name.length > 3 && !isCommonWord(name)) {
+      addEntity(entities, name, "topic");
+    }
+  }
+
+  // Questions
+  PATTERNS.question.lastIndex = 0;
+  while ((match = PATTERNS.question.exec(text)) !== null) {
+    const name = match[1].trim();
+    if (name.length > 3 && !isCommonWord(name)) {
+      addEntity(entities, name, "question");
+    }
   }
 
   // Concepts
@@ -329,18 +365,22 @@ function extractEntities(text, sessionDate) {
     }
   }
 
-  // Co-occurrence = mentioned_with
+  // Co-occurrence = mentioned_with (with context)
   const entityList = Array.from(entities.entries()).map(([name, info]) => ({
     name: canonicalizeName(name),
     type: info.type
   }));
   for (let i = 0; i < entityList.length; i++) {
     for (let j = i + 1; j < entityList.length; j++) {
+      const ei = entityList[i].name;
+      const ej = entityList[j].name;
+      // Find a sentence containing both entities
+      const context = extractContext(text, ei) || extractContext(text, ej) || null;
       relationships.push({
-        source: entityList[i].name,
-        target: entityList[j].name,
+        source: ei,
+        target: ej,
         type: "mentioned_with",
-        context: null
+        context: context
       });
     }
   }
@@ -361,9 +401,20 @@ function addEntity(entities, name, type) {
 function guessEntityType(name) {
   if (/\.(md|ts|tsx|js|json|py)$/.test(name)) return "file";
   if (/^(npm|pnpm|yarn|git|curl|node|docker|vercel|supabase|clerk)$/.test(name)) return "tool";
+  if (/\?$/.test(name)) return "question";
+  if (/^(decided to|agreed on|chose|opted for|settled on|committed to)/i.test(name)) return "decision";
+  if (/^(topic|subject|theme|area|field)\s*[:]/i.test(name)) return "topic";
   if (name.includes(" ") && name[0] === name[0].toUpperCase()) return "concept";
   if (/^(User|Agent|Alice|Bob|Charlie|User Name|Agent Name|Collaborator One|Advisor One|Advisor Two)$/.test(name)) return "person";
   return "concept";
+}
+
+function extractContext(text, entityName, windowSize = 80) {
+  const idx = text.indexOf(entityName);
+  if (idx === -1) return null;
+  const start = Math.max(0, idx - windowSize);
+  const end = Math.min(text.length, idx + entityName.length + windowSize);
+  return text.slice(start, end).replace(/\s+/g, ' ').trim();
 }
 
 function isCommonWord(word) {
