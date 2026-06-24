@@ -18,6 +18,7 @@
  */
 
 const { extractWithLLM } = require('./llm-extractor.cjs');
+const { generateEmbedding, batchEmbedding } = require('./embeddings.cjs');
 const fs = require("fs");
 const path = require("path");
 
@@ -42,6 +43,7 @@ const WATERMARK_PATH = path.join(MEMORY_DIR, ".session-watermark.json");
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const processAll = args.includes("--all");
+const skipEmbeddings = args.includes("--skip-embeddings");
 const specificFile = args.includes("--file")
   ? args[args.indexOf("--file") + 1]
   : null;
@@ -101,8 +103,10 @@ function ensureSchema() {
       confidence REAL,
       description TEXT,
       strength REAL,
-      context TEXT
+      context TEXT,
+      embedding BLOB
     );
+    ALTER TABLE entities ADD COLUMN embedding BLOB;
     CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name);
     CREATE INDEX IF NOT EXISTS idx_entities_canonical ON entities(canonical_name);
     CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type);
@@ -137,7 +141,7 @@ function ensureSchema() {
         db.run(stmt);
       }
     } catch (e) {
-      if (!e.message.includes("already exists")) {
+      if (!e.message.includes("already exists") && !e.message.includes("duplicate column name")) {
         console.error("Schema error:", e.message);
       }
     }
@@ -561,8 +565,39 @@ function upsertEntity(name, canonicalName, type, date, confidence, description, 
   }
 }
 
+async function updateEntityEmbeddings(entityNames) {
+  if (skipEmbeddings || dryRun) return;
+  if (!entityNames || entityNames.length === 0) return;
+
+  // Find which entities already have embeddings
+  const existing = db.prepare(
+    `SELECT name FROM entities WHERE name IN (${entityNames.map(() => '?').join(',')}) AND embedding IS NOT NULL`
+  ).all(...entityNames);
+  const existingNames = new Set(existing.map(r => r.name));
+
+  const toEmbed = entityNames.filter(name => !existingNames.has(name));
+  if (toEmbed.length === 0) return;
+
+  // Get canonical names for embedding
+  const rows = db.prepare(
+    `SELECT name, canonical_name, description FROM entities WHERE name IN (${toEmbed.map(() => '?').join(',')})`
+  ).all(...toEmbed);
+
+  const texts = rows.map(r => r.description || r.canonical_name || r.name);
+
+  try {
+    const embeddings = await batchEmbedding(texts);
+    const updateStmt = db.prepare('UPDATE entities SET embedding = ? WHERE name = ?');
+    for (let i = 0; i < rows.length; i++) {
+      const buffer = Buffer.from(embeddings[i].buffer);
+      updateStmt.run(buffer, rows[i].name);
+    }
+  } catch (err) {
+    console.error('Embedding generation failed:', err.message);
+  }
+}
+
 function upsertRelationship(source, target, type, context, date) {
-  if (dryRun) return;
   const stmt = `
     INSERT INTO relationships (source, target, relation_type, first_seen, last_seen, mention_count, context)
     VALUES (?, ?, ?, ?, ?, 1, ?)
@@ -741,6 +776,7 @@ async function processSessionFile(sessionPath) {
   for (const [key, info] of entities) {
     upsertEntity(key, info.name, info.type, sessionDate, info.confidence, info.description, info.context);
   }
+  await updateEntityEmbeddings(Array.from(entities.keys()));
   for (const rel of relationships) {
     upsertRelationship(rel.source, rel.target, rel.type, rel.context, sessionDate);
   }
