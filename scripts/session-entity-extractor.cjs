@@ -18,6 +18,7 @@
  */
 
 const { extractWithLLM } = require('./llm-extractor.cjs');
+const fs = require("fs");
 const path = require("path");
 
 /* ── Paths ───────────────────────────────────── */

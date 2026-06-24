@@ -53,7 +53,7 @@ The `session-entity-extractor.cjs` now uses LLM-based extraction as the primary 
 ```bash
 export OPENROUTER_API_KEY="sk-or-v1-..."
 export LLM_MODEL="openai/gpt-4o-mini"
-export LLM_BASE_URL="https://openrouter.ai/api"
+export LLM_BASE_URL="https://openrouter.ai/api/v1"
 node scripts/session-entity-extractor.cjs
 ```
 
@@ -86,7 +86,7 @@ Environment variables used by `llm-extractor.cjs`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OPENROUTER_API_KEY` | — | API key (falls back to `OPENAI_API_KEY`, `KIMI_API_KEY`) |
-| `LLM_BASE_URL` | `https://openrouter.ai/api` | API base URL |
+| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | API base URL |
 | `LLM_MODEL` | `openai/gpt-4o-mini` | Model identifier |
 
 ## Quick Start

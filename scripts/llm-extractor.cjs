@@ -188,7 +188,7 @@ function createChunks(text, maxChars = DEFAULT_MAX_CHUNK_SIZE) {
 /* ── LLM extraction for a single chunk ───────── */
 async function extractChunk(chunk, options = {}) {
   const apiKey = options.apiKey || process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY || process.env.KIMI_API_KEY;
-  const baseURL = (options.baseURL || process.env.LLM_BASE_URL || 'https://openrouter.ai/api').replace(/\/$/, '');
+  const baseURL = (options.baseURL || process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
   const model = options.model || process.env.LLM_MODEL || DEFAULT_MODEL;
   const maxTokens = options.maxTokens || DEFAULT_MAX_TOKENS;
   const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
