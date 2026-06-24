@@ -17,7 +17,7 @@
  *   node session-entity-extractor.js --file <path>      # process specific file
  */
 
-const fs = require("fs");
+const { extractWithLLM } = require('./llm-extractor.cjs');
 const path = require("path");
 
 /* ── Paths ───────────────────────────────────── */
@@ -537,20 +537,23 @@ function isCommonWord(word) {
 }
 
 /* ── Database operations ─────────────────────── */
-function upsertEntity(name, canonicalName, type, date) {
+function upsertEntity(name, canonicalName, type, date, confidence, description, context) {
   if (dryRun) return;
   const stmt = `
     INSERT INTO entities (name, canonical_name, first_seen, last_seen, mention_count, entity_type, confidence, description, strength, context)
-    VALUES (?, ?, ?, ?, 1, ?, NULL, NULL, NULL, NULL)
+    VALUES (?, ?, ?, ?, 1, ?, ?, ?, NULL, ?)
     ON CONFLICT(name) DO UPDATE SET
       last_seen = ?,
-      mention_count = mention_count + 1
+      mention_count = mention_count + 1,
+      confidence = COALESCE(MAX(confidence, excluded.confidence), confidence),
+      description = COALESCE(description, excluded.description),
+      context = COALESCE(context, excluded.context)
   `;
   try {
     if (typeof db.prepare === 'function') {
-      db.prepare(stmt).run(name, canonicalName, date, date, type, date);
+      db.prepare(stmt).run(name, canonicalName, date, date, type, confidence || null, description || null, context || null, date);
     } else if (typeof db.run === 'function') {
-      db.run(stmt, [name, canonicalName, date, date, type, date]);
+      db.run(stmt, [name, canonicalName, date, date, type, confidence || null, description || null, context || null, date]);
     }
   } catch (e) {
     console.error(`Failed to upsert entity ${name}:`, e.message);
@@ -580,7 +583,7 @@ function upsertRelationship(source, target, type, context, date) {
 }
 
 /* ── Process a single session file ───────────── */
-function processSessionFile(sessionPath) {
+async function processSessionFile(sessionPath) {
   const basename = path.basename(sessionPath, ".jsonl");
   console.error(`Processing session: ${basename}`);
 
@@ -622,11 +625,85 @@ function processSessionFile(sessionPath) {
     return { entities: 0, relationships: 0, sessionDate };
   }
 
-  // Extract standard entities
+  const llmResult = await extractWithLLM(allText, { silent: true });
+
+  // Extract standard entities (regex fallback + supplement)
   const { entities, relationships } = extractEntities(allText, sessionDate);
 
   // Extract protocol entities
   const { entities: protoEntities, relationships: protoRelationships } = extractProtocolEntities(allText, sessionDate);
+
+  // Merge LLM entities (primary source)
+  if (llmResult && llmResult.entities && llmResult.entities.length > 0) {
+    for (const ent of llmResult.entities) {
+      const key = ent.name.toLowerCase().trim();
+      if (entities.has(key)) {
+        const existing = entities.get(key);
+        existing.count++;
+        existing.confidence = Math.max(existing.confidence || 0, ent.confidence || 0);
+        if (ent.description && !existing.description) existing.description = ent.description;
+        if (ent.context && !existing.context) existing.context = ent.context;
+      } else {
+        entities.set(key, {
+          name: canonicalizeName(ent.name),
+          original: ent.name,
+          type: ent.type || 'concept',
+          count: 1,
+          confidence: ent.confidence || 0.5,
+          description: ent.description || null,
+          context: ent.context || null,
+        });
+      }
+    }
+
+    // Add LLM decisions as entities
+    for (const dec of llmResult.decisions || []) {
+      const key = `decision:${dec.text.slice(0, 80).toLowerCase()}`;
+      if (!entities.has(key)) {
+        entities.set(key, {
+          name: `decision:${dec.text.slice(0, 100)}`,
+          original: dec.text,
+          type: 'decision',
+          count: 1,
+          confidence: dec.confidence || 0.5,
+          description: dec.text,
+          context: dec.context || null,
+        });
+      }
+    }
+
+    // Add LLM topics as entities
+    for (const topic of llmResult.topics || []) {
+      const key = topic.name.toLowerCase().trim();
+      if (!entities.has(key)) {
+        entities.set(key, {
+          name: canonicalizeName(topic.name),
+          original: topic.name,
+          type: 'topic',
+          count: 1,
+          confidence: topic.confidence || 0.5,
+          description: null,
+          context: topic.context || null,
+        });
+      }
+    }
+
+    // Add LLM questions as entities
+    for (const q of llmResult.questions || []) {
+      const key = `question:${q.text.slice(0, 80).toLowerCase()}`;
+      if (!entities.has(key)) {
+        entities.set(key, {
+          name: `question:${q.text.slice(0, 100)}`,
+          original: q.text,
+          type: 'question',
+          count: 1,
+          confidence: q.confidence || 0.5,
+          description: q.text,
+          context: q.context || null,
+        });
+      }
+    }
+  }
 
   // Merge protocol entities into main entities map
   for (const [key, info] of protoEntities) {
@@ -661,7 +738,7 @@ function processSessionFile(sessionPath) {
   }
 
   for (const [key, info] of entities) {
-    upsertEntity(key, info.name, info.type, sessionDate);
+    upsertEntity(key, info.name, info.type, sessionDate, info.confidence, info.description, info.context);
   }
   for (const rel of relationships) {
     upsertRelationship(rel.source, rel.target, rel.type, rel.context, sessionDate);
@@ -671,7 +748,7 @@ function processSessionFile(sessionPath) {
 }
 
 /* ── Main ────────────────────────────────────── */
-function main() {
+async function main() {
   ensureSchema();
 
   let sessionFiles;
@@ -722,7 +799,7 @@ function main() {
   let maxMtime = 0;
 
   for (const file of sessionFiles) {
-    const result = processSessionFile(file);
+    const result = await processSessionFile(file);
     totalEntities += result.entities;
     totalRelationships += result.relationships;
     const mtime = fs.statSync(file).mtimeMs;
@@ -742,4 +819,7 @@ function main() {
   if (db && typeof db.close === 'function') db.close();
 }
 
-main();
+main().catch(err => {
+  console.error('Fatal error:', err.message);
+  process.exit(1);
+});
