@@ -18,6 +18,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { generateEmbedding } = require("./embeddings.cjs");
 
 /* ── Paths ───────────────────────────────────── */
 const MEMORY_DIR = path.join(
@@ -35,6 +36,7 @@ const DB_PATH = path.join(MEMORY_DIR, "graph.db");
 const args = process.argv.slice(2);
 const incremental = args.includes("--incremental");
 const visualize = args.includes("--visualize");
+const skipEmbeddings = args.includes("--skip-embeddings");
 const dateOverride = args.includes("--date")
   ? args[args.indexOf("--date") + 1]
   : null;
@@ -81,8 +83,12 @@ if (dateOverride) {
   }
 }
 
-/* ── Generate statistics ─────────────────────── */
-console.log("\nGraph statistics:");
+/* ── Session summaries ───────────────────────── */
+(async () => {
+  await processSessionSummaries();
+
+  /* ── Generate statistics ─────────────────────── */
+  console.log("\nGraph statistics:");
 try {
   const stats = execSync(`node "${path.join(SCRIPTS_DIR, "knowledge-graph.cjs")}" stats`, {
     encoding: "utf8"
@@ -299,10 +305,147 @@ function generateHTMLViz() {
   console.log(`Open in browser: file://${htmlPath}`);
 }
 
-console.log("\n✅ Graph build complete!");
-console.log(`Database: ${DB_PATH}`);
-console.log(`\nQuery commands:`);
-console.log(`  node scripts/knowledge-graph.cjs stats`);
-console.log(`  node scripts/knowledge-graph.cjs query "User Name"`);
-console.log(`  node scripts/knowledge-graph.cjs search "quantum"`);
-console.log(`  node scripts/knowledge-graph.cjs export --format gexf`);
+  console.log("\n✅ Graph build complete!");
+  console.log(`Database: ${DB_PATH}`);
+  console.log(`\nQuery commands:`);
+  console.log(`  node scripts/knowledge-graph.cjs stats`);
+  console.log(`  node scripts/knowledge-graph.cjs query "User Name"`);
+  console.log(`  node scripts/knowledge-graph.cjs search "quantum"`);
+  console.log(`  node scripts/knowledge-graph.cjs export --format gexf`);
+})();
+
+async function processSessionSummaries() {
+  let journalFiles;
+  if (dateOverride) {
+    const file = path.join(JOURNAL_DIR, `${dateOverride}.md`);
+    if (!fs.existsSync(file)) return;
+    journalFiles = [file];
+  } else {
+    try {
+      journalFiles = fs.readdirSync(JOURNAL_DIR)
+        .filter(f => f.endsWith(".md"))
+        .map(f => path.join(JOURNAL_DIR, f))
+        .sort();
+    } catch (e) {
+      console.error("No journal directory for session summaries");
+      return;
+    }
+  }
+
+  let db;
+  try {
+    const Database = require("better-sqlite3");
+    db = new Database(DB_PATH);
+  } catch (e) {
+    try {
+      const sqlite3 = require("sqlite3");
+      db = new sqlite3.Database(DB_PATH);
+    } catch (e2) {
+      console.error("No SQLite module for session summaries");
+      return;
+    }
+  }
+
+  try {
+    if (typeof db.exec === 'function') {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS session_summaries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_date TEXT NOT NULL,
+          summary_text TEXT,
+          embedding BLOB,
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(session_date)
+        );
+      `);
+    } else if (typeof db.run === 'function') {
+      db.run(`
+        CREATE TABLE IF NOT EXISTS session_summaries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_date TEXT NOT NULL,
+          summary_text TEXT,
+          embedding BLOB,
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(session_date)
+        );
+      `);
+    }
+  } catch (e) {
+    if (!e.message.includes("already exists") && !e.message.includes("duplicate column name")) {
+      console.error("Schema error for session_summaries:", e.message);
+    }
+  }
+
+  for (const file of journalFiles) {
+    const basename = path.basename(file, ".md");
+    let text;
+    try {
+      text = fs.readFileSync(file, "utf8");
+    } catch (e) {
+      console.error(`Failed to read journal for summary: ${e.message}`);
+      continue;
+    }
+
+    let existing = null;
+    try {
+      if (typeof db.prepare === 'function') {
+        existing = db.prepare("SELECT summary_text FROM session_summaries WHERE session_date = ?").get(basename);
+      } else if (typeof db.get === 'function') {
+        existing = await new Promise((resolve, reject) => {
+          db.get("SELECT summary_text FROM session_summaries WHERE session_date = ?", [basename], (err, row) => {
+            if (err) reject(err);
+            else resolve(row);
+          });
+        });
+      }
+    } catch (e) {
+      console.error("Failed to check existing summary:", e.message);
+    }
+
+    if (existing && existing.summary_text === text) {
+      continue;
+    }
+
+    try {
+      if (typeof db.prepare === 'function') {
+        db.prepare(`
+          INSERT INTO session_summaries (session_date, summary_text)
+          VALUES (?, ?)
+          ON CONFLICT(session_date) DO UPDATE SET
+            summary_text = excluded.summary_text,
+            created_at = datetime('now')
+        `).run(basename, text);
+      } else if (typeof db.run === 'function') {
+        db.run(`
+          INSERT INTO session_summaries (session_date, summary_text)
+          VALUES (?, ?)
+          ON CONFLICT(session_date) DO UPDATE SET
+            summary_text = excluded.summary_text,
+            created_at = datetime('now')
+        `, [basename, text]);
+      }
+    } catch (e) {
+      console.error(`Failed to upsert summary for ${basename}:`, e.message);
+      continue;
+    }
+
+    if (!skipEmbeddings) {
+      try {
+        const embedding = await generateEmbedding(text);
+        const buffer = Buffer.from(embedding.buffer);
+        if (typeof db.prepare === 'function') {
+          db.prepare("UPDATE session_summaries SET embedding = ? WHERE session_date = ?")
+            .run(buffer, basename);
+        } else if (typeof db.run === 'function') {
+          db.run("UPDATE session_summaries SET embedding = ? WHERE session_date = ?", [buffer, basename]);
+        }
+      } catch (e) {
+        console.error(`Failed to embed summary for ${basename}:`, e.message);
+      }
+    }
+  }
+
+  if (db && typeof db.close === 'function') {
+    db.close();
+  }
+}
