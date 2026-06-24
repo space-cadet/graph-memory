@@ -70,14 +70,14 @@ class KnowledgeGraph {
   }
 
   /** Get neighbors of an entity */
-  getNeighbors(name) {
+  getNeighbors(name, minStrength = 0.05) {
     const outgoing = this.db.prepare(
-      "SELECT r.*, e.name as target_name, e.entity_type as target_type FROM relationships r JOIN entities e ON r.target = e.name WHERE r.source = ? COLLATE NOCASE"
-    ).all(name);
+      "SELECT r.*, e.name as target_name, e.entity_type as target_type FROM relationships r JOIN entities e ON r.target = e.name WHERE r.source = ? COLLATE NOCASE AND r.strength >= ? ORDER BY r.strength DESC LIMIT 50"
+    ).all(name, minStrength);
     
     const incoming = this.db.prepare(
-      "SELECT r.*, e.name as source_name, e.entity_type as source_type FROM relationships r JOIN entities e ON r.source = e.name WHERE r.target = ? COLLATE NOCASE"
-    ).all(name);
+      "SELECT r.*, e.name as source_name, e.entity_type as source_type FROM relationships r JOIN entities e ON r.source = e.name WHERE r.target = ? COLLATE NOCASE AND r.strength >= ? ORDER BY r.strength DESC LIMIT 50"
+    ).all(name, minStrength);
     
     return { outgoing, incoming };
   }
