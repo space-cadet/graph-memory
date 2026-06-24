@@ -30,7 +30,12 @@ CREATE TABLE entities (
   first_seen TEXT,
   last_seen TEXT,
   mention_count INTEGER DEFAULT 1,
-  entity_type TEXT
+  entity_type TEXT,
+  confidence REAL,
+  description TEXT,
+  strength REAL,
+  context TEXT,
+  embedding BLOB          -- 384-dim float32 (1536 bytes), all-MiniLM-L6-v2
 );
 
 CREATE TABLE relationships (
@@ -42,7 +47,18 @@ CREATE TABLE relationships (
   last_seen TEXT,
   mention_count INTEGER DEFAULT 1,
   context TEXT,
+  confidence REAL,
+  strength REAL,
   UNIQUE(source, target, relation_type)
+);
+
+CREATE TABLE session_summaries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_date TEXT NOT NULL,
+  summary_text TEXT,
+  embedding BLOB,           -- 384-dim float32 (1536 bytes)
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(session_date)
 );
 ```
 
@@ -55,6 +71,6 @@ CREATE TABLE relationships (
 
 ## Future Tech
 
-- Embedding-based semantic search (Phase 2)
+- ~~Embedding-based semantic search (Phase 2)~~ → In progress (T7)
 - Incremental watermark system for session files
 - `session-entity-extractor.cjs` — direct JSONL extraction (in progress)
