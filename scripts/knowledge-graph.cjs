@@ -7,6 +7,7 @@
  *
  * Usage:
  *   node knowledge-graph.js query "ts-quantum"          # find entity + neighbors
+ *   node knowledge-graph.js semantic-search "quantum"     # search by semantic similarity
  *   node knowledge-graph.js path "User" "ts-quantum"   # shortest path
  *   node knowledge-graph.js related "clerk"             # entities related to clerk
  *   node knowledge-graph.js stats                       # graph statistics
@@ -16,6 +17,10 @@
 
 const fs = require("fs");
 const path = require("path");
+
+const { generateEmbedding, cosineSimilarity } = require("./embeddings.cjs");
+
+const EMBEDDING_DIM = 384;
 
 const MEMORY_DIR = path.join(
   process.env.HOME,
@@ -59,6 +64,42 @@ class KnowledgeGraph {
     const pattern = `%${query}%`;
     const stmt = this.db.prepare(sql);
     return type ? stmt.all(pattern, pattern, type, limit) : stmt.all(pattern, pattern, limit);
+  }
+
+  /** Semantic search entities by cosine similarity */
+  async semanticSearchEntities(query, limit = 10) {
+    const queryEmbedding = await generateEmbedding(query);
+    const rows = this.db.prepare("SELECT * FROM entities WHERE embedding IS NOT NULL").all();
+
+    if (rows.length === 0) {
+      return { results: this.searchEntities(query, null, limit), fallback: true, query };
+    }
+
+    const scored = rows.map(row => {
+      const emb = new Float32Array(row.embedding.buffer, row.embedding.byteOffset, EMBEDDING_DIM);
+      return { entity: row, similarity: cosineSimilarity(queryEmbedding, emb) };
+    });
+
+    scored.sort((a, b) => b.similarity - a.similarity);
+    return { results: scored.slice(0, limit), fallback: false, query };
+  }
+
+  /** Semantic search session summaries by cosine similarity */
+  async semanticSearchSessions(query, limit = 10) {
+    const queryEmbedding = await generateEmbedding(query);
+    const rows = this.db.prepare("SELECT * FROM session_summaries WHERE embedding IS NOT NULL").all();
+
+    if (rows.length === 0) {
+      return { results: [], fallback: true, query };
+    }
+
+    const scored = rows.map(row => {
+      const emb = new Float32Array(row.embedding.buffer, row.embedding.byteOffset, EMBEDDING_DIM);
+      return { session: row, similarity: cosineSimilarity(queryEmbedding, emb) };
+    });
+
+    scored.sort((a, b) => b.similarity - a.similarity);
+    return { results: scored.slice(0, limit), fallback: false, query };
   }
 
   /** Get all entities by type */
@@ -367,143 +408,191 @@ class KnowledgeGraph {
 
 /* ── CLI ─────────────────────────────────────── */
 
-const graph = new KnowledgeGraph();
-const command = process.argv[2];
-const arg = process.argv[3];
+async function main() {
+  const graph = new KnowledgeGraph();
+  const command = process.argv[2];
+  const arg = process.argv[3];
 
-function printEntity(e) {
-  if (!e) {
-    console.log("Entity not found.");
-    return;
-  }
-  console.log(`\n${e.name} [${e.entity_type}]`);
-  console.log(`  Mentions: ${e.mention_count}`);
-  console.log(`  First seen: ${e.first_seen}`);
-  console.log(`  Last seen: ${e.last_seen}`);
-  
-  const neighbors = graph.getNeighbors(e.name);
-  if (neighbors.outgoing.length > 0) {
-    console.log(`\n  Outgoing (${neighbors.outgoing.length}):`);
-    for (const n of neighbors.outgoing.slice(0, 10)) {
-      console.log(`    → ${n.target_name} [${n.relation_type}]`);
+  function printEntity(e) {
+    if (!e) {
+      console.log("Entity not found.");
+      return;
     }
-  }
-  if (neighbors.incoming.length > 0) {
-    console.log(`\n  Incoming (${neighbors.incoming.length}):`);
-    for (const n of neighbors.incoming.slice(0, 10)) {
-      console.log(`    ← ${n.source_name} [${n.relation_type}]`);
-    }
-  }
-}
-
-switch (command) {
-  case "query": {
-    const entity = graph.getEntity(arg);
-    printEntity(entity);
-    break;
-  }
-  
-  case "search": {
-    const type = process.argv.includes("--type") ? process.argv[process.argv.indexOf("--type") + 1] : null;
-    const results = graph.searchEntities(arg, type);
-    console.log(`Found ${results.length} entities matching "${arg}":\n`);
-    for (const e of results) {
-      console.log(`  ${e.name} [${e.entity_type}] — ${e.mention_count} mentions`);
-    }
-    break;
-  }
-  
-  case "path": {
-    const end = process.argv[4];
-    const path = graph.findPath(arg, end);
-    if (path) {
-      console.log(`Path from "${arg}" to "${end}":`);
-      console.log(path.join(" → "));
-    } else {
-      console.log(`No path found between "${arg}" and "${end}" within 5 hops.`);
-    }
-    break;
-  }
-  
-  case "related": {
-    const related = graph.getRelated(arg);
-    console.log(`Entities related to "${arg}":\n`);
-    for (const r of related) {
-      console.log(`  ${r.name} [${r.entity_type}] — ${r.shared_connections} shared connections`);
-    }
-    break;
-  }
-  
-  case "stats": {
-    const stats = graph.getStats();
-    console.log("Knowledge Graph Statistics");
-    console.log("==========================");
-    console.log(`Entities: ${stats.entities}`);
-    console.log(`Relationships: ${stats.relationships}`);
-    console.log(`\nEntity types:`);
-    for (const t of stats.entityTypes) {
-      console.log(`  ${t.entity_type || "uncategorized"}: ${t.count}`);
-    }
-    console.log(`\nRelationship types:`);
-    for (const t of stats.relationshipTypes) {
-      console.log(`  ${t.relation_type}: ${t.count}`);
-    }
-    break;
-  }
-  
-  case "export": {
-    const format = process.argv.includes("--format") ? process.argv[process.argv.indexOf("--format") + 1] : "json";
-    const outputDir = path.join(MEMORY_DIR, "graph");
-    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+    console.log(`\n${e.name} [${e.entity_type}]`);
+    console.log(`  Mentions: ${e.mention_count}`);
+    console.log(`  First seen: ${e.first_seen}`);
+    console.log(`  Last seen: ${e.last_seen}`);
     
-    let content, filename;
-    switch (format) {
-      case "dot":
-        content = graph.exportDOT();
-        filename = "graph.dot";
-        break;
-      case "gexf":
-        content = graph.exportGEXF();
-        filename = "graph.gexf";
-        break;
-      case "json":
-      default:
-        content = JSON.stringify(graph.exportJSON(), null, 2);
-        filename = "graph.json";
+    const neighbors = graph.getNeighbors(e.name);
+    if (neighbors.outgoing.length > 0) {
+      console.log(`\n  Outgoing (${neighbors.outgoing.length}):`);
+      for (const n of neighbors.outgoing.slice(0, 10)) {
+        console.log(`    → ${n.target_name} [${n.relation_type}]`);
+      }
+    }
+    if (neighbors.incoming.length > 0) {
+      console.log(`\n  Incoming (${neighbors.incoming.length}):`);
+      for (const n of neighbors.incoming.slice(0, 10)) {
+        console.log(`    ← ${n.source_name} [${n.relation_type}]`);
+      }
+    }
+  }
+
+  switch (command) {
+    case "query": {
+      const entity = graph.getEntity(arg);
+      printEntity(entity);
+      break;
     }
     
-    const outputPath = path.join(outputDir, filename);
-    fs.writeFileSync(outputPath, content);
-    console.log(`Exported to ${outputPath}`);
-    break;
-  }
-  
-  case "list": {
-    const type = arg || null;
-    const entities = graph.getAllEntities(type);
-    console.log(`${entities.length} entities${type ? ` of type "${type}"` : ""}:\n`);
-    for (const e of entities.slice(0, 50)) {
-      console.log(`  ${e.name} [${e.entity_type}] — ${e.mention_count} mentions`);
+    case "semantic-search": {
+      const limit = process.argv.includes("--limit") ? parseInt(process.argv[process.argv.indexOf("--limit") + 1]) : 10;
+      const includeSessions = !process.argv.includes("--no-sessions");
+      
+      console.log(`Running semantic search for "${arg}"...\n`);
+      
+      const [entityResults, sessionResults] = await Promise.all([
+        graph.semanticSearchEntities(arg, limit),
+        includeSessions ? graph.semanticSearchSessions(arg, limit) : Promise.resolve({ results: [], fallback: true }),
+      ]);
+      
+      if (entityResults.fallback) {
+        console.log("(No entity embeddings found — falling back to text search)\n");
+      }
+      
+      console.log(`Entities (${entityResults.results.length} results):`);
+      if (entityResults.results.length === 0) {
+        console.log("  No matching entities found.");
+      } else if (entityResults.fallback) {
+        for (const e of entityResults.results) {
+          console.log(`  ${e.name} [${e.entity_type}] — ${e.mention_count} mentions`);
+        }
+      } else {
+        for (const r of entityResults.results) {
+          console.log(`  ${r.entity.name} [${r.entity.entity_type}] — similarity: ${r.similarity.toFixed(4)} — ${r.entity.mention_count} mentions`);
+        }
+      }
+      
+      if (includeSessions) {
+        console.log(`\nSession Summaries (${sessionResults.results.length} results):`);
+        if (sessionResults.results.length === 0) {
+          if (sessionResults.fallback) {
+            console.log("  (No session embeddings found yet)");
+          } else {
+            console.log("  No matching sessions found.");
+          }
+        } else {
+          for (const r of sessionResults.results) {
+            const preview = r.session.summary_text ? r.session.summary_text.slice(0, 100).replace(/\n/g, " ") : "(no summary)";
+            console.log(`  ${r.session.session_date} — similarity: ${r.similarity.toFixed(4)} — ${preview}...`);
+          }
+        }
+      }
+      break;
     }
-    if (entities.length > 50) {
-      console.log(`\n  ... and ${entities.length - 50} more`);
+    
+    case "search": {
+      const type = process.argv.includes("--type") ? process.argv[process.argv.indexOf("--type") + 1] : null;
+      const results = graph.searchEntities(arg, type);
+      console.log(`Found ${results.length} entities matching "${arg}":\n`);
+      for (const e of results) {
+        console.log(`  ${e.name} [${e.entity_type}] — ${e.mention_count} mentions`);
+      }
+      break;
     }
-    break;
-  }
-  
-  case "visualize": {
-    const html = graph.generateVisualization();
-    const outputPath = path.join(GRAPH_DIR, "knowledge-graph.html");
-    fs.writeFileSync(outputPath, html);
-    console.log(`Visualization written to ${outputPath}`);
-    break;
-  }
-  
-  default:
-    console.log(`Usage: node knowledge-graph.js <command> [args]
+    
+    case "path": {
+      const end = process.argv[4];
+      const path = graph.findPath(arg, end);
+      if (path) {
+        console.log(`Path from "${arg}" to "${end}":`);
+        console.log(path.join(" → "));
+      } else {
+        console.log(`No path found between "${arg}" and "${end}" within 5 hops.`);
+      }
+      break;
+    }
+    
+    case "related": {
+      const related = graph.getRelated(arg);
+      console.log(`Entities related to "${arg}":\n`);
+      for (const r of related) {
+        console.log(`  ${r.name} [${r.entity_type}] — ${r.shared_connections} shared connections`);
+      }
+      break;
+    }
+    
+    case "stats": {
+      const stats = graph.getStats();
+      console.log("Knowledge Graph Statistics");
+      console.log("==========================");
+      console.log(`Entities: ${stats.entities}`);
+      console.log(`Relationships: ${stats.relationships}`);
+      console.log(`\nEntity types:`);
+      for (const t of stats.entityTypes) {
+        console.log(`  ${t.entity_type || "uncategorized"}: ${t.count}`);
+      }
+      console.log(`\nRelationship types:`);
+      for (const t of stats.relationshipTypes) {
+        console.log(`  ${t.relation_type}: ${t.count}`);
+      }
+      break;
+    }
+    
+    case "export": {
+      const format = process.argv.includes("--format") ? process.argv[process.argv.indexOf("--format") + 1] : "json";
+      const outputDir = path.join(MEMORY_DIR, "graph");
+      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+      
+      let content, filename;
+      switch (format) {
+        case "dot":
+          content = graph.exportDOT();
+          filename = "graph.dot";
+          break;
+        case "gexf":
+          content = graph.exportGEXF();
+          filename = "graph.gexf";
+          break;
+        case "json":
+        default:
+          content = JSON.stringify(graph.exportJSON(), null, 2);
+          filename = "graph.json";
+      }
+      
+      const outputPath = path.join(outputDir, filename);
+      fs.writeFileSync(outputPath, content);
+      console.log(`Exported to ${outputPath}`);
+      break;
+    }
+    
+    case "list": {
+      const type = arg || null;
+      const entities = graph.getAllEntities(type);
+      console.log(`${entities.length} entities${type ? ` of type "${type}"` : ""}:\n`);
+      for (const e of entities.slice(0, 50)) {
+        console.log(`  ${e.name} [${e.entity_type}] — ${e.mention_count} mentions`);
+      }
+      if (entities.length > 50) {
+        console.log(`\n  ... and ${entities.length - 50} more`);
+      }
+      break;
+    }
+    
+    case "visualize": {
+      const html = graph.generateVisualization();
+      const outputPath = path.join(GRAPH_DIR, "knowledge-graph.html");
+      fs.writeFileSync(outputPath, html);
+      console.log(`Visualization written to ${outputPath}`);
+      break;
+    }
+    
+    default:
+      console.log(`Usage: node knowledge-graph.js <command> [args]
 
 Commands:
   query <name>              Show entity details and neighbors
+  semantic-search <query>   Search by semantic similarity (requires embeddings)
   search <query> [--type]   Search entities by name
   path <start> <end>        Find shortest path between entities
   related <name>            Find entities with shared connections
@@ -514,13 +603,23 @@ Commands:
 
 Examples:
   node knowledge-graph.js query "User Name"
+  node knowledge-graph.js semantic-search "quantum computing"
   node knowledge-graph.js search "quantum"
   node knowledge-graph.js path "User" "Research Area One"
   node knowledge-graph.js export --format gexf
   node knowledge-graph.js visualize
 `);
+  }
+
+  if (db && typeof db.close === "function") {
+    db.close();
+  }
 }
 
-if (db && typeof db.close === "function") {
-  db.close();
-}
+main().catch(err => {
+  console.error(`Error: ${err.message}`);
+  if (db && typeof db.close === "function") {
+    db.close();
+  }
+  process.exit(1);
+});
