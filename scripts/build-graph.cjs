@@ -2,17 +2,18 @@
 /**
  * build-graph.cjs
  * ─────────────────────────────────────────────
- * Integration script that reads journal files from OpenClaw sessions
- * and builds the entity knowledge graph using entity-extractor.cjs.
+ * Integration script that reads session files from OpenClaw
+ * and builds the entity knowledge graph using session-entity-extractor.cjs.
  *
  * This is designed to be run periodically (e.g. via cron) to keep
- * the graph up-to-date with new journal entries.
+ * the graph up-to-date with new session entries.
  *
  * Usage:
- *   node build-graph.cjs                    # process all journals
- *   node build-graph.cjs --incremental     # only process new journals
- *   node build-graph.cjs --date 2026-05-21 # process specific date
+ *   node build-graph.cjs                    # process all sessions
+ *   node build-graph.cjs --incremental     # only process new sessions
+ *   node build-graph.cjs --date 2026-05-21 # process journal for specific date
  *   node build-graph.cjs --visualize       # build + generate HTML viz
+ *   node build-graph.cjs --skip-embeddings # skip embedding generation for faster builds
  */
 
 const fs = require("fs");
@@ -55,7 +56,8 @@ if (!fs.existsSync(GRAPH_DIR)) {
 /* ── Run entity-extractor.cjs ─────────────────── */
 console.log("Building knowledge graph from journal files...");
 
-const extractorPath = path.join(SCRIPTS_DIR, "entity-extractor.cjs");
+const extractorPath = path.join(SCRIPTS_DIR, "session-entity-extractor.cjs");
+const legacyExtractorPath = path.join(SCRIPTS_DIR, "entity-extractor.cjs");
 if (!fs.existsSync(extractorPath)) {
   console.error(`Entity extractor not found: ${extractorPath}`);
   process.exit(1);
@@ -64,7 +66,7 @@ if (!fs.existsSync(extractorPath)) {
 if (dateOverride) {
   console.log(`Processing date: ${dateOverride}`);
   try {
-    execSync(`node "${extractorPath}" --date ${dateOverride}`, {
+    execSync(`node "${legacyExtractorPath}" --date ${dateOverride}`, {
       stdio: "inherit"
     });
   } catch (e) {
@@ -72,13 +74,14 @@ if (dateOverride) {
     process.exit(1);
   }
 } else {
-  console.log("Processing all journal files...");
+  console.log("Processing all session files...");
+  const extractorArgs = skipEmbeddings ? " --skip-embeddings" : "";
   try {
-    execSync(`node "${extractorPath}"`, {
+    execSync(`node "${extractorPath}"${extractorArgs}`, {
       stdio: "inherit"
     });
   } catch (e) {
-    console.error(`Failed to process journals: ${e.message}`);
+    console.error(`Failed to process sessions: ${e.message}`);
     process.exit(1);
   }
 }
