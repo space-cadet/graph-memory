@@ -12,6 +12,7 @@
  *   node scripts/queue-worker.cjs               # process pending jobs once
  *   node scripts/queue-worker.cjs --watch       # keep polling for new jobs
  *   node scripts/queue-worker.cjs --enqueue <file>  # add a job to queue
+ *   node scripts/queue-worker.cjs --enqueue-only    # enqueue new sessions, don't process
  *   node scripts/queue-worker.cjs --status      # show queue status
  *   node scripts/queue-worker.cjs --clear       # clear completed jobs
  */
@@ -36,6 +37,7 @@ const SCRIPT_DIR = __dirname;
 const args = process.argv.slice(2);
 const watch = args.includes("--watch");
 const dryRun = args.includes("--dry-run");
+const enqueueOnly = args.includes("--enqueue-only");
 const showStatus = args.includes("--status");
 const clearCompleted = args.includes("--clear");
 
@@ -297,6 +299,15 @@ async function main() {
   
   if (enqueueFile) {
     await enqueueJob(enqueueFile);
+    return;
+  }
+  
+  if (enqueueOnly) {
+    const enqueued = await enqueueNewSessions();
+    console.log(`Enqueue-only: ${enqueued} new session file(s) added to queue.`);
+    if (db && typeof db.close === "function") {
+      db.close();
+    }
     return;
   }
   
