@@ -92,11 +92,11 @@ export async function regenerateTasks(outputPath) {
   const completed = allTasks.filter(t => t.status === 'completed');
   const pending = allTasks.filter(t => t.status === 'pending');
 
-  let md = '# Memory Bank - Graph Memory System\n\n';
+  let md = '# Memory Bank - Sage Workspace\n\n';
   md += `*Created: ${now}*\n`;
   md += `*Last Updated: ${now}*\n\n`;
   md += '## Overview\n\n';
-  md += 'This is the Memory Bank for the Graph Memory System.\n\n';
+  md += 'This is the Memory Bank for the Sage (灵剑) OpenClaw workspace.\n\n';
 
   // Active Tasks
   if (active.length > 0) {
