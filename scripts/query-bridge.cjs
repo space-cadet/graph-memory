@@ -34,6 +34,38 @@ async function getEmbeddings() {
   return embeddingsModule;
 }
 
+/* ── LRU Cache ───────────────────────────────── */
+const CACHE_MAX = 20;
+const CACHE_TTL_MS = 60000; // 60 seconds
+const cache = new Map();
+
+function getCacheKey(type, args) {
+  return `${type}:${JSON.stringify(args)}`;
+}
+
+function getCached(key) {
+  const entry = cache.get(key);
+  if (entry && Date.now() - entry.ts < CACHE_TTL_MS) {
+    // Move to end (LRU)
+    cache.delete(key);
+    cache.set(key, entry);
+    return entry.data;
+  }
+  return null;
+}
+
+function setCached(key, data) {
+  if (cache.size >= CACHE_MAX) {
+    const firstKey = cache.keys().next().value;
+    cache.delete(firstKey);
+  }
+  cache.set(key, { ts: Date.now(), data });
+}
+
+function clearCache() {
+  cache.clear();
+}
+
 /* ── Database ────────────────────────────────── */
 let db;
 let dbMode = "none";
@@ -42,6 +74,12 @@ try {
   const Database = require("better-sqlite3");
   db = new Database(DB_PATH);
   dbMode = "better-sqlite3";
+  // Enable WAL mode and larger page cache for read-heavy workloads
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
+    PRAGMA cache_size = -64000;
+  `);
 } catch (e) {
   try {
     const sqlite3 = require("sqlite3");
@@ -89,9 +127,14 @@ class QueryBridge {
 
   /**
    * Search entities by text query (fuzzy match on name/canonical_name).
+   * Uses FTS5 when available, falls back to LIKE.
    * Options: { type, limit, deep, includeRelated }
    */
   search(query, options = {}) {
+    const cacheKey = getCacheKey("search", [query, options]);
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     const { type = null, limit = 20, deep = false, includeRelated = false } = options;
     const results = [];
 
@@ -101,15 +144,25 @@ class QueryBridge {
       results.push(this._enrichEntity(exact, deep));
     }
 
-    // 2. Fuzzy match
-    const fuzzy = this._fuzzySearch(query, type, limit);
-    for (const e of fuzzy) {
+    // 2. FTS5 search (fast full-text)
+    const fts = this._ftsSearch(query, type, limit);
+    for (const e of fts) {
       if (!results.find(r => r.name === e.name)) {
         results.push(this._enrichEntity(e, deep));
       }
     }
 
-    // 3. Related entities
+    // 3. Fuzzy LIKE fallback (if FTS5 returned fewer results)
+    if (results.length < limit) {
+      const fuzzy = this._fuzzySearch(query, type, limit - results.length);
+      for (const e of fuzzy) {
+        if (!results.find(r => r.name === e.name)) {
+          results.push(this._enrichEntity(e, deep));
+        }
+      }
+    }
+
+    // 4. Related entities
     if (includeRelated && results.length > 0) {
       const related = this._getRelatedToResults(results, limit);
       for (const r of related) {
@@ -119,7 +172,25 @@ class QueryBridge {
       }
     }
 
-    return results.slice(0, limit);
+    const final = results.slice(0, limit);
+    setCached(cacheKey, final);
+    return final;
+  }
+
+  _ftsSearch(query, type, limit) {
+    try {
+      db.prepare("SELECT 1 FROM entities_fts LIMIT 1").get();
+    } catch (e) {
+      return []; // FTS5 not available
+    }
+    const escaped = query.replace(/"/g, '""');
+    const ftsQuery = escaped + "*";
+    const sql = type
+      ? `SELECT e.* FROM entities_fts f JOIN entities e ON e.id = f.rowid WHERE f.entities_fts MATCH ? AND e.entity_type = ? ORDER BY rank LIMIT ?`
+      : `SELECT e.* FROM entities_fts f JOIN entities e ON e.id = f.rowid WHERE f.entities_fts MATCH ? ORDER BY rank LIMIT ?`;
+    return type
+      ? dbAll(sql, [ftsQuery, type, limit])
+      : dbAll(sql, [ftsQuery, limit]);
   }
 
   /**
@@ -159,9 +230,15 @@ class QueryBridge {
    * Exact entity lookup by name. Returns entity with neighbors.
    */
   lookup(name) {
+    const cacheKey = getCacheKey("lookup", [name]);
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     const entity = this._getExact(name);
     if (!entity) return null;
-    return this._enrichEntity(entity, true);
+    const result = this._enrichEntity(entity, true);
+    setCached(cacheKey, result);
+    return result;
   }
 
   /**
@@ -169,6 +246,10 @@ class QueryBridge {
    * Returns { path, entity } pairs.
    */
   traverse(name, maxDepth = 2) {
+    const cacheKey = getCacheKey("traverse", [name, maxDepth]);
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     const visited = new Set([name]);
     const results = [];
     let current = [{ name, path: [] }];
@@ -191,6 +272,7 @@ class QueryBridge {
       if (current.length === 0) break;
     }
 
+    setCached(cacheKey, results);
     return results;
   }
 
@@ -300,7 +382,7 @@ class QueryBridge {
 const queryBridge = new QueryBridge();
 
 /* ── Exports ─────────────────────────────────── */
-module.exports = { QueryBridge, queryBridge };
+module.exports = { QueryBridge, queryBridge, clearCache };
 
 /* ── CLI ─────────────────────────────────────── */
 if (require.main === module) {

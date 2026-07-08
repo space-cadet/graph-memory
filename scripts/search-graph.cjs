@@ -42,6 +42,7 @@ class GraphSearchBridge {
   /**
    * Search entities by query string.
    * Returns ranked list of entities with optional neighbor context.
+   * Uses FTS5 if available, falls back to LIKE.
    */
   search(query, options = {}) {
     const { type = null, limit = 20, deep = false, includeRelated = false } = options;
@@ -53,15 +54,25 @@ class GraphSearchBridge {
       results.push(this._enrichEntity(exact, deep));
     }
 
-    // 2. Fuzzy match on name / canonical_name
-    const fuzzy = this._fuzzySearch(query, type, limit);
-    for (const e of fuzzy) {
+    // 2. FTS5 full-text search (fast, ranked)
+    const ftsResults = this._ftsSearch(query, type, limit);
+    for (const e of ftsResults) {
       if (!results.find(r => r.name === e.name)) {
         results.push(this._enrichEntity(e, deep));
       }
     }
 
-    // 3. Relationship search (find entities connected to matching entities)
+    // 3. Fuzzy LIKE fallback (only if FTS5 returned nothing or not available)
+    if (results.length < limit) {
+      const fuzzy = this._fuzzySearch(query, type, limit - results.length);
+      for (const e of fuzzy) {
+        if (!results.find(r => r.name === e.name)) {
+          results.push(this._enrichEntity(e, deep));
+        }
+      }
+    }
+
+    // 4. Relationship search (find entities connected to matching entities)
     if (includeRelated && results.length > 0) {
       const related = this._getRelatedToResults(results, limit);
       for (const r of related) {
@@ -72,6 +83,25 @@ class GraphSearchBridge {
     }
 
     return results.slice(0, limit);
+  }
+
+  _ftsSearch(query, type, limit) {
+    try {
+      // Check if FTS5 table exists and has rows
+      this.db.prepare("SELECT 1 FROM entities_fts LIMIT 1").get();
+    } catch (e) {
+      return []; // FTS5 not available, fall back to LIKE
+    }
+
+    // Build FTS5 query: escape special chars, add wildcard for prefix matching
+    const escaped = query.replace(/"/g, '""');
+    const ftsQuery = escaped + "*";
+
+    const sql = type
+      ? `SELECT e.* FROM entities_fts f JOIN entities e ON e.id = f.rowid WHERE f.entities_fts MATCH ? AND e.entity_type = ? ORDER BY rank LIMIT ?`
+      : `SELECT e.* FROM entities_fts f JOIN entities e ON e.id = f.rowid WHERE f.entities_fts MATCH ? ORDER BY rank LIMIT ?`;
+    const stmt = this.db.prepare(sql);
+    return type ? stmt.all(ftsQuery, type, limit) : stmt.all(ftsQuery, limit);
   }
 
   _getExact(name) {
