@@ -1,5 +1,32 @@
 # Edit History
 
+## 2026-07-08 12:30 UTC — T13,T14,T15: Integration Planning Session
+
+**Context**: User requested integration roadmap for graph-memory with OpenClaw and mulch systems. Assessed current state, rejected Rust rewrite, designed three new tasks.
+
+### Task Updates
+- **[Modified]** `memory-bank/tasks/T8.md` — Updated to **completed** status. Queue worker operational since 2026-06-25, 9,543 sessions processed.
+- **[Modified]** `memory-bank/tasks.md` — Regenerated with 15 tasks (was 12). Added T13, T14, T15.
+- **[Modified]** `memory-bank/activeContext.md` — Updated current focus to T13, shifted priorities.
+- **[Modified]** `memory-bank/systemPatterns.md` — Added 3 new patterns: OpenClaw Skill Wrapper, Mulch Feedback Loop, SQLite Performance Optimization.
+
+### New Tasks Created
+- **[Created]** `memory-bank/tasks/T13.md` — Graph-Memory OpenClaw Skill. Skill wrapper exposing graph search/stats/related as typed functions.
+- **[Created]** `memory-bank/tasks/T14.md` — Mulch Integration Pipeline. Nightly cron querying graph → recording patterns in mulch.
+- **[Created]** `memory-bank/tasks/T15.md` — Query Optimization (FTS5 + Caching). Add FTS5, LRU cache, WAL mode. Explicitly rejects Rust rewrite.
+
+### Implementation Details Created
+- **[Created]** `memory-bank/implementation-details/graph-integration-plan.md` — Full integration roadmap with 3 tracks, priority order, success metrics.
+- **[Created]** `memory-bank/implementation-details/rust-rewrite-analysis.md` — Decision record rejecting Rust rewrite in favor of SQLite optimizations.
+
+### Key Decisions Recorded
+- Rust rewrite: **REJECTED** — SQLite C API already optimal, JS overhead negligible
+- T8: **COMPLETED** — queue-worker.cjs running since 2026-06-25
+- Integration priority: T13 (skill) → T14 (mulch) → T15 (optimization) → T6 (LLM)
+- Mulch threshold: >5 mentions to prevent noise
+
+---
+
 ## 2026-06-19 08:12:00 — T1: Initialized .openclaw_memory and ran extraction tests
 - [Copied] `.openclaw_memory/scripts/session-entity-extractor.cjs` — Updated extractor from repo
 - [Copied] `.openclaw_memory/scripts/knowledge-graph.cjs` — Updated query tool from repo
@@ -24,17 +51,10 @@
 - [create] `memory-bank/templates/` — Copied templates from workspace memory-bank
 
 ## 2026-06-18 18:50:00 — T1,T2: Created graph-memory repo. Copied existing scripts from .openclaw_memory. Initialized DB memory bank. Populated with existing context.
-
-## 2026-06-18 18:50:00 — T1,T2: Created graph-memory repo. Copied existing scripts from .openclaw_memory. Initialized DB memory bank. Populated with existing context.
 - [create] `scripts/` — Copied entity-extractor.cjs, knowledge-graph.cjs, build-graph.cjs, journal-writer.cjs, read-session.cjs, batch-process-all-sessions.sh from .openclaw_memory
 - [create] `memory-bank/database/lib/` — Copied inserts.js, regenerate.js, sqlite.js, workflow.js, schema.sql from workspace memory-bank
 - [create] `projectbrief.md` — Project brief documenting graph memory system goals
 - [create] `memory-bank/tasks.md` — Active tasks: T1-T5 for graph system improvement
-- [create] `scripts/` — Copied entity-extractor.cjs, knowledge-graph.cjs, build-graph.cjs, journal-writer.cjs, read-session.cjs, batch-process-all-sessions.sh from .openclaw_memory
-- [create] `memory-bank/database/lib/` — Copied inserts.js, regenerate.js, sqlite.js, workflow.js, schema.sql from workspace memory-bank
-- [create] `projectbrief.md` — Project brief documenting graph memory system goals
-- [create] `memory-bank/tasks.md` — Active tasks: T1-T5 for graph system improvement
-
 
 ## 2026-06-24
 
@@ -55,4 +75,3 @@
 - Co-occurrence relationships now include contextual snippets instead of null
 - Updated `guessEntityType()` to detect new types
 - Committed and pushed to `main`
-

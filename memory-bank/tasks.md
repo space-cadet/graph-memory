@@ -1,6 +1,6 @@
 # Graph Memory Tasks
 
-*Generated: 2026-06-25*
+*Generated: 2026-07-08*
 
 ## Task Overview
 
@@ -13,8 +13,11 @@
 | T5 | Historical Backfill | ⬜ pending | ⬇️ low | 2026-06-18 | 2026-06-18 | Reprocess all historical session JSONLs with new extractor to rebuild graph from full conversation text. |
 | T6 | LLM-Based Entity Extraction | ⬜ pending | 🔥 high | 2026-06-18 | 2026-06-18 | Replace regex patterns with LLM-based entity extraction from session text. Extract entities, decisions, topics, questions with confidence scores. Phase 1 of architectural improvement plan. |
 | T7 | Vector Embeddings + Semantic Search | ⬜ pending | 🔥 high | 2026-06-18 | 2026-06-18 | Add embedding vectors per session summary and entity. Enable semantic search via cosine similarity. Use all-MiniLM-L6-v2 or equivalent (384-dim). Phase 2 of architectural plan. |
-| T8 | Background Processing Queue | ⬜ pending | ⏺️ medium | 2026-06-18 | 2026-06-18 | Decouple extraction from heartbeat. Use queue-based async processing. Heartbeat enqueues, worker processes in background. Phase 3 of architectural plan. |
+| T8 | Background Processing Queue | ✅ completed | ⏺️ medium | 2026-06-18 | 2026-07-08 | Decouple extraction from heartbeat. Use queue-based async processing. Heartbeat enqueues, worker processes in background. Phase 3 of architectural plan. **COMPLETED**: queue-worker.cjs running since 2026-06-25, 9,543 sessions processed. |
 | T9 | Temporal Decay + Relationship Strength | ⬜ pending | ⏺️ medium | 2026-06-18 | 2026-06-18 | Add confidence and strength fields to relationships. Implement temporal decay: relationships fade if not reinforced. Phase 4 of architectural plan. |
 | T10 | Multi-Source Ingestion | ⬜ pending | 🔥 high | 2026-06-18 | 2026-06-18 | Ingest git commits, file modifications, calendar events, arXiv API. Transform graph from conversation-only to full work context. Phase 5 of architectural plan. |
 | T11 | Agent Integration | ⬜ pending | 🔥 high | 2026-06-18 | 2026-06-18 | Integrate graph queries into agent memory pipeline. Query graph as first-class memory source before falling back to MEMORY.md. Phase 6 of architectural plan. |
 | T12 | Memory-Bank Protocol Extraction | ✅ completed | 🔥 high | 2026-06-22 | 2026-06-22 | Extended session-entity-extractor.cjs to understand memory-bank protocol v6.12. Added task, edit_chunk, decision, blocker, next_action, file_change entity types. Created memory-bank-reconstructor.cjs that queries graph and outputs memory-bank markdown. Reconstructed 5 days (2026-06-17 through 2026-06-21) after workspace git reset. Graph: 968 sessions → 1,159 entities → 8,392 relationships. |
+| T13 | Graph-Memory OpenClaw Skill | ⬜ pending | 🔥 high | 2026-07-08 | 2026-07-08 | Create an OpenClaw skill wrapper (skills/graph-memory/) that exposes graph queries as first-class tools. Provides: graph search <query>, graph stats, graph related <entity>. Returns structured markdown for agent consumption. Depends on T3 (search bridge exists but needs skill formalization). |
+| T14 | Mulch Integration Pipeline | ⬜ pending | 🔥 high | 2026-07-08 | 2026-07-08 | Nightly cron pipeline that queries graph for emerging patterns (high-mention entities, new topics, repeated errors) and converts them to mulch learning records. Cross-references graph top-entities with .learnings/ to avoid duplication. Threshold: only record entities with >5 mentions or weekly novelty. Runs at 3:06 AM IST after existing mulch cron. |
+| T15 | Query Optimization (FTS5 + Caching) | ⬜ pending | ⏺️ medium | 2026-07-08 | 2026-07-08 | Add SQLite FTS5 virtual table for full-text search on entity names and descriptions. Implement in-memory LRU cache for top 20 frequent queries. Enable WAL mode for concurrent reads during writes. Benchmark: target <50ms for 95th percentile queries. Rust rewrite NOT recommended — SQLite C API is already optimal. |

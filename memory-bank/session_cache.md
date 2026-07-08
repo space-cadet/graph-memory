@@ -1,55 +1,41 @@
 # Session Cache
 
-## Current Session
-- **Session ID**: sess-2026-06-19-morning-graph-test
-- **Date**: 2026-06-19
-- **Period**: morning
-- **Focus**: T1
-- **Status**: active
+*Last Updated: 2026-07-08 12:30 UTC*
 
 ## Task Counts
-- **Active**: 7
-- **Paused**: 0
-- **Completed**: 1
-- **Pending**: 4
 
-## Active Tasks
-| ID | Title | Status | Priority |
-|----|-------|--------|----------|
-| T1 | Graph Update Automation | in_progress | HIGH |
-| T3 | Memory Search Bridge | pending | HIGH |
-| T4 | Entity Quality Improvements | pending | MEDIUM |
-| T6 | LLM-Based Entity Extraction | pending | HIGH |
-| T7 | Vector Embeddings + Semantic Search | pending | HIGH |
-| T8 | Background Processing Queue | pending | MEDIUM |
-| T10 | Multi-Source Ingestion | pending | HIGH |
+| Status | Count |
+|--------|-------|
+| Completed | 3 (T2, T8, T12) |
+| In Progress | 1 (T1) |
+| Pending | 11 (T3, T4, T5, T6, T7, T9, T10, T11, T13, T14, T15) |
+| **Total** | **15** |
 
-## Completed Tasks
-| ID | Title | Status | Priority |
-|----|-------|--------|----------|
-| T2 | Session-Entity-Extractor (Direct JSONL) | completed | HIGH |
+## Recently Modified Tasks
 
-## Pending Tasks
-| ID | Title | Status | Priority |
-|----|-------|--------|----------|
-| T5 | Historical Backfill | pending | LOW |
-| T9 | Temporal Decay + Relationship Strength | pending | MEDIUM |
-| T11 | Agent Integration | pending | HIGH |
+| ID | Title | Last Updated | Change |
+|----|-------|-------------|--------|
+| T13 | Graph-Memory OpenClaw Skill | 2026-07-08 | Created — new integration task |
+| T14 | Mulch Integration Pipeline | 2026-07-08 | Created — new nightly cron task |
+| T15 | Query Optimization (FTS5 + Caching) | 2026-07-08 | Created — performance task |
+| T8 | Background Processing Queue | 2026-07-08 | Status changed: pending → completed |
+| T1 | Graph Update Automation | 2026-06-18 | In progress (heartbeat integration) |
 
----
+## Current Session Focus
 
-## 2026-06-24 Session
+**Primary**: T13 — Graph-Memory OpenClaw Skill
+**Secondary**: T14 — Mulch Integration Pipeline (depends on T13)
+**Background**: T1 — Graph Update Automation (heartbeat-driven, ongoing)
 
-**Started**: 2026-06-24 06:00 IST
-**Focus Task**: T3/T4: Search Bridge + Temporal Decay + Entity Quality
-**Status**: ✅ Complete
+## Files Modified in This Session
 
-### Completed
-- T3: Memory Search Bridge — `search-graph.cjs` CLI wrapper
-- T4: Temporal Decay — `temporal-decay.cjs` batch processor, strength-aware queries
-- T4: Entity Quality — decision/topic/question types, context extraction
-
-### Next
-- T5: Historical Backfill (82 sessions, incremental processing)
-- T6: Background Processing Queue
-- T7: Agent Integration
+- `memory-bank/tasks.md` — Regenerated with 15 tasks
+- `memory-bank/tasks/T8.md` — Updated to completed
+- `memory-bank/tasks/T13.md` — Created
+- `memory-bank/tasks/T14.md` — Created
+- `memory-bank/tasks/T15.md` — Created
+- `memory-bank/activeContext.md` — Updated priorities
+- `memory-bank/systemPatterns.md` — Added 3 patterns
+- `memory-bank/edit_history.md` — Added session entry
+- `memory-bank/implementation-details/graph-integration-plan.md` — Created
+- `memory-bank/implementation-details/rust-rewrite-analysis.md` — Created

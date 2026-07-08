@@ -3,23 +3,23 @@
 ## Pattern: Heartbeat-Driven Graph Updates
 
 **Context**: Graph needs to stay current without manual intervention  
-**Solution**: Run graph build on every 2nd heartbeat, alongside journal processing  
-**Trade-off**: Delay of ~1 hour between session and graph update  
-**Status**: Planned (T1)
+**Solution**: Heartbeat enqueues new sessions to SQLite queue; background worker processes independently  
+**Trade-off**: Delay of ~30s between session and graph update (worker polls every 30s)  
+**Status**: Implemented (T8 completed)
 
 ## Pattern: Direct JSONL Extraction
 
 **Context**: Journal-based extraction loses semantic content due to truncation  
 **Solution**: Read raw session JSONL files, extract full conversation text  
 **Trade-off**: More data = slower processing, but richer entities  
-**Status**: In progress (T2)
+**Status**: Implemented (T2 completed)
 
 ## Pattern: Watermark-Based Incremental Processing
 
-**Context**: 13,702 session files exist; full rebuild is too slow  
+**Context**: 9,955 session files exist; full rebuild is too slow  
 **Solution**: Track last-processed file/line in a watermark file, only process new data  
 **Trade-off**: Requires careful watermark management to avoid missing data  
-**Status**: Planned (T2)
+**Status**: Implemented
 
 ## Pattern: Generic Aliases for Public Release
 
@@ -83,3 +83,24 @@
 **Solution**: Ingest git commits, file modifications, calendar events, arXiv API
 **Trade-off**: More complex pipeline, but richer context for agent queries
 **Status**: Designed (T10)
+
+## Pattern: OpenClaw Skill Wrapper
+
+**Context**: Graph queries require shell commands (`node scripts/...`) which are fragile and slow
+**Solution**: Package graph queries as an OpenClaw skill with typed functions
+**Trade-off**: Extra abstraction layer, but enables in-process calls (<10ms vs ~200ms)
+**Status**: Designed (T13)
+
+## Pattern: Mulch Feedback Loop
+
+**Context**: Graph discovers patterns but agent never learns from them
+**Solution**: Nightly cron queries graph → filters novel patterns → records in mulch
+**Trade-off**: Potential for noise if thresholds too low; requires deduplication
+**Status**: Designed (T14)
+
+## Pattern: SQLite Performance Optimization
+
+**Context**: Fuzzy `LIKE %query%` queries are slow (~50-200ms) on growing dataset
+**Solution**: FTS5 virtual table for full-text search + in-memory LRU cache + WAL mode
+**Trade-off**: FTS5 increases DB size ~20%; cache requires invalidation logic
+**Status**: Designed (T15)
