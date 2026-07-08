@@ -27,6 +27,47 @@
 
 ---
 
+## 2026-07-08 12:44 UTC — T13, T14, T15: Implementation Complete (Subagents)
+
+**Context**: User directed three subagents with k2.7-code to implement T13, T14, T15 in parallel. All three completed successfully.
+
+### Task Completions
+- **[Completed]** T13: Graph-Memory OpenClaw Skill (subagent runtime ~14m, 46k tokens)
+  - Created `skills/graph-memory/` with SKILL.md, query.js, _meta.json, package.json
+  - 3 functions: graph_search, graph_stats, graph_related — all return markdown
+  - Error handling: missing DB, missing driver, empty query, not found, runtime error
+  - Statement cache (10 prepared statements), LRU-like eviction
+  - Upstream bug found: query-bridge.cjs _ftsSearch crashes on hyphens ("mail-setup")
+  - Commit: `0621509` pushed to origin/master
+- **[Completed]** T14: Mulch Integration Pipeline (subagent runtime ~5m, 37k tokens)
+  - Created `scripts/mulch-integration.cjs` — 4 pattern detectors, deduplication, dry-run default
+  - Created `scripts/mulch-cron-config.md` — 3:06 AM IST cron config
+  - Test: 7-day window → 0 candidates (stale data). 30-day → 30 candidates, 3 deduplicated
+  - Commit: `16a3127` pushed to origin/master
+- **[Completed]** T15: Query Optimization (FTS5 + Caching) (subagent runtime ~5m, 46k tokens)
+  - Modified `scripts/query-bridge.cjs` — LRU cache (20 entries, 60s TTL), WAL mode, 64MB cache
+  - Modified `scripts/search-graph.cjs` — FTS5 search path with fallback
+  - Created `scripts/setup-fts5.cjs` — FTS5 migration with sync triggers, backfilled 6,829 rows
+  - Created `scripts/benchmark-queries.cjs` — 100 iterations, reports min/max/mean/median/p95/p99
+  - Benchmark results: FTS5 p95=0.02ms (100x faster than LIKE p95=1.96ms), BFS p95=45.6ms (under 50ms target)
+  - Commit: `6dcdeaf` pushed to origin/master
+
+### Memory Bank Updates
+- **[Modified]** `memory-bank/tasks.md` — T13, T14, T15 marked completed
+- **[Modified]** `memory-bank/activeContext.md` — Current focus shifted to T6 (LLM extraction quality)
+- **[Modified]** `memory-bank/session_cache.md` — Task counts: 6 completed, 8 pending
+- **[Modified]** `memory-bank/tasks/T14.md` — Status updated to completed
+- **[Modified]** `memory-bank/tasks/T15.md` — Status updated to completed
+- **[Database]** `memory-bank/database/memory_bank.db` — T13, T14, T15 status set to completed
+
+### Key Decisions
+- All three integration tasks completed in one session using parallel subagents
+- T13 upstream bug (FTS5 hyphen crash) worked around in wrapper, should be fixed in query-bridge.cjs proper
+- Next priority: T6 (LLM-Based Entity Extraction) — regex misses ~90% of content
+- Graph data is stale (last extraction 2026-06-24), needs worker to resume processing fresh sessions
+
+---
+
 ## 2026-06-19 08:12:00 — T1: Initialized .openclaw_memory and ran extraction tests
 - [Copied] `.openclaw_memory/scripts/session-entity-extractor.cjs` — Updated extractor from repo
 - [Copied] `.openclaw_memory/scripts/knowledge-graph.cjs` — Updated query tool from repo
