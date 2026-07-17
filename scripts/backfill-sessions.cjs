@@ -718,7 +718,7 @@ async function main() {
   try {
     sessionFiles = fs
       .readdirSync(SESSIONS_DIR)
-      .filter((f) => f.endsWith(".jsonl") && !f.endsWith(".trajectory.jsonl"))
+      .filter((f) => f.endsWith(".jsonl") && !f.endsWith(".trajectory.jsonl") && !f.includes(".checkpoint."))
       .map((f) => path.join(SESSIONS_DIR, f))
       .sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs);
   } catch (e) {

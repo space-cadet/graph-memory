@@ -107,7 +107,7 @@ CREATE INDEX idx_sessions_status ON sessions(status);
 CREATE TABLE session_cache (
   session_id TEXT PRIMARY KEY,
   status TEXT,
-  focus_task TEXT,
+  focus TEXT,
   active_tasks_count INTEGER DEFAULT 0,
   paused_tasks_count INTEGER DEFAULT 0,
   completed_tasks_count INTEGER DEFAULT 0,

@@ -89,6 +89,73 @@ function canonicalizeName(name) {
   return NAME_ALIASES[lower] || name.trim();
 }
 
+/* ── Session summary generation ────────────── */
+async function generateSessionSummary(sessionFile, sessionDate, entities, relationships) {
+  // Extract key topics from entities
+  const topics = Array.from(entities.values())
+    .filter(e => e.type === 'concept' || e.type === 'topic' || e.type === 'task')
+    .map(e => e.name)
+    .slice(0, 10);
+
+  // Extract key decisions
+  const decisions = relationships
+    .filter(r => r.type === 'decision_made_in_session')
+    .map(r => r.source.replace('decision:', '').slice(0, 100))
+    .slice(0, 5);
+
+  // Extract tasks mentioned
+  const tasks = Array.from(entities.values())
+    .filter(e => e.type === 'task')
+    .map(e => e.name)
+    .slice(0, 10);
+
+  // Extract projects/files worked on
+  const projects = Array.from(entities.values())
+    .filter(e => e.type === 'project' || e.type === 'file')
+    .map(e => e.name)
+    .slice(0, 10);
+
+  // Build summary matching existing schema
+  const summary = {
+    session_date: sessionDate,
+    summary_text: `Session covering: ${topics.join(', ')}. ` +
+      (tasks.length ? `Tasks: ${tasks.join(', ')}. ` : '') +
+      (projects.length ? `Projects/files: ${projects.join(', ')}. ` : '') +
+      (decisions.length ? `Decisions: ${decisions.join('; ')}` : ''),
+    embedding: null, // Could generate embedding later
+    created_at: new Date().toISOString()
+  };
+
+  return summary;
+}
+
+function saveSessionSummary(db, summary) {
+  const stmt = `
+    INSERT OR REPLACE INTO session_summaries (
+      session_date, summary_text, embedding, created_at
+    ) VALUES (?, ?, ?, ?)
+  `;
+  try {
+    if (typeof db.prepare === 'function') {
+      db.prepare(stmt).run(
+        summary.session_date,
+        summary.summary_text,
+        summary.embedding ? Buffer.from(summary.embedding.buffer) : null,
+        summary.created_at
+      );
+    } else if (typeof db.run === 'function') {
+      db.run(stmt, [
+        summary.session_date,
+        summary.summary_text,
+        summary.embedding ? Buffer.from(summary.embedding.buffer) : null,
+        summary.created_at
+      ]);
+    }
+  } catch (e) {
+    console.error('Failed to save session summary:', e.message);
+  }
+}
+
 /* ── Ensure schema ───────────────────────────── */
 function ensureSchema() {
   const schema = `
@@ -125,6 +192,15 @@ function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_rel_source ON relationships(source);
     CREATE INDEX IF NOT EXISTS idx_rel_target ON relationships(target);
     CREATE INDEX IF NOT EXISTS idx_rel_type ON relationships(relation_type);
+
+    CREATE TABLE IF NOT EXISTS session_summaries (
+      id INTEGER PRIMARY KEY,
+      session_date TEXT UNIQUE NOT NULL,
+      summary_text TEXT NOT NULL,
+      embedding BLOB,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_session_summaries_date ON session_summaries(session_date);
   `;
 
   if (dryRun) {
@@ -215,6 +291,25 @@ function extractThinking(content) {
     .filter((c) => c.type === "thinking")
     .map((c) => c.thinking)
     .join("\n");
+}
+
+/* ── Parse message content from session format ─ */
+function parseMessageContent(msg) {
+  if (!msg) return { text: "", thinking: "" };
+  
+  // Handle nested JSON string content
+  let content = msg.content;
+  if (typeof content === "string" && content.startsWith("[")) {
+    try {
+      content = JSON.parse(content);
+    } catch (e) {
+      // Not JSON, use as-is
+    }
+  }
+  
+  const text = extractText(content);
+  const thinking = extractThinking(content);
+  return { text, thinking };
 }
 
 /* ── Extract protocol entities from text ─────── */
@@ -649,8 +744,7 @@ async function processSessionFile(sessionPath) {
     if (entry.type === "message" && entry.message) {
       const msg = entry.message;
       if (msg.role === "user" || msg.role === "assistant") {
-        const text = extractText(msg.content);
-        const thinking = extractThinking(msg.content);
+        const { text, thinking } = parseMessageContent(msg);
         allText += text + "\n" + thinking + "\n";
       }
     }
@@ -781,7 +875,11 @@ async function processSessionFile(sessionPath) {
     upsertRelationship(rel.source, rel.target, rel.type, rel.context, sessionDate);
   }
 
-  return { entities: entities.size, relationships: relationships.length, sessionDate };
+  // Generate and save session summary
+  const summary = await generateSessionSummary(basename, sessionDate, entities, relationships);
+  saveSessionSummary(db, summary);
+
+  return { entities: entities.size, relationships: relationships.length, sessionDate, summary: summary.summary_text };
 }
 
 /* ── Main ────────────────────────────────────── */

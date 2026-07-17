@@ -1,8 +1,8 @@
 /**
  * sql.js Adapter Module
- * Provides a better-sqlite3-compatible interface for sql.js (WASM SQLite)
+ * Provides a sql.js-compatible interface for sql.js (WASM SQLite)
  *
- * Key differences from better-sqlite3:
+ * Key differences from sql.js:
  * - All operations are async (WASM initialization)
  * - Database lives in memory, must explicitly save to disk
  * - Write queue prevents concurrent save corruption
@@ -207,7 +207,7 @@ export async function withTransaction(fn) {
 }
 
 /**
- * Create a prepared statement object compatible with better-sqlite3 API
+ * Create a prepared statement object compatible with sql.js API
  * This allows code like: db.prepare(sql).get(params)
  *
  * @param {string} sql - SQL query/statement
@@ -260,7 +260,7 @@ export function prepare(sql) {
 }
 
 /**
- * Create a transaction function compatible with better-sqlite3 API
+ * Create a transaction function compatible with sql.js API
  * This allows code like: const run = db.transaction(fn); run(args);
  *
  * @param {Function} fn - Function to wrap in transaction
@@ -320,7 +320,7 @@ export async function closeDb() {
 }
 
 /**
- * Create a Database-like object compatible with better-sqlite3 patterns
+ * Create a Database-like object compatible with sql.js patterns
  * This allows minimal changes to existing code
  *
  * @param {string} dbPath - Path to database file
