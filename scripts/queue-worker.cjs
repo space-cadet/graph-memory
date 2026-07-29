@@ -20,6 +20,7 @@
 const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 
 const WORKSPACE_DIR = path.join(process.env.HOME, ".openclaw", "workspace");
 const MEMORY_DIR = path.join(WORKSPACE_DIR, ".openclaw_memory");
@@ -47,7 +48,30 @@ if (enqueueIdx !== -1 && args[enqueueIdx + 1]) {
   enqueueFile = args[enqueueIdx + 1];
 }
 
-/* ── Database setup ──────────────────────────── */
+/* ── File reading helpers ──────────────────── */
+function readSessionFile(filePath) {
+  const isGz = filePath.endsWith('.gz');
+  if (!isGz) {
+    return fs.readFileSync(filePath, "utf8");
+  }
+  // Decompress gzipped session on the fly
+  const compressed = fs.readFileSync(filePath);
+  return zlib.gunzipSync(compressed).toString("utf8");
+}
+
+function listSessionFiles(dir) {
+  const files = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const name = entry.name;
+    // Accept .jsonl and .jsonl.gz, skip trajectory files
+    if ((name.endsWith(".jsonl") || name.endsWith(".jsonl.gz")) && !name.includes(".trajectory.")) {
+      files.push(path.join(dir, name));
+    }
+  }
+  return files;
+}
 let db;
 let betterSqlite;
 
@@ -244,19 +268,8 @@ async function processBatch(limit = 5) {
 
 /* ── Auto-enqueue new sessions ───────────────── */
 async function enqueueNewSessions() {
-  // Find all .jsonl session files not yet in queue
-  const allFiles = [];
-  try {
-    const entries = fs.readdirSync(SESSIONS_DIR, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isFile() && entry.name.endsWith(".jsonl") && !entry.name.endsWith(".trajectory.jsonl")) {
-        allFiles.push(path.join(SESSIONS_DIR, entry.name));
-      }
-    }
-  } catch (e) {
-    console.error("Failed to read sessions directory:", e.message);
-    return 0;
-  }
+  // Find all session files not yet in queue
+  const allFiles = listSessionFiles(SESSIONS_DIR);
   
   let enqueued = 0;
   for (const file of allFiles) {

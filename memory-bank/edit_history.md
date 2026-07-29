@@ -116,3 +116,23 @@
 - Co-occurrence relationships now include contextual snippets instead of null
 - Updated `guessEntityType()` to detect new types
 - Committed and pushed to `main`
+
+---
+
+## 2026-07-29 19:40 UTC — Tiered Memory: Gzip Support Fix
+
+**Context**: While checking repo sync status, discovered uncommitted changes in graph-memory scripts. These changes add `.jsonl.gz` support to enable the Tier 1 → Tier 2 pipeline from the tiered-memory-graph spec.
+
+### Changes Made
+- **[Modified]** `scripts/backfill-sessions.cjs` — Added `readSessionFile()` helper with `zlib.gunzipSync`; updated file filter to include `.jsonl.gz`
+- **[Modified]** `scripts/queue-worker.cjs` — Added `readSessionFile()` and `listSessionFiles()` helpers; replaced inline file listing with shared helper
+- **[Modified]** `scripts/session-entity-extractor.cjs` — Added `readSessionFile()` helper; updated filter for `.jsonl.gz`
+- **[Modified]** `memory-bank/activeContext.md` — Recorded fix in "Recent Fixes" section
+
+### Rationale
+Per `mb-hygiene/graph-memory/implementation-details/tiered-memory-graph.md`, Tier 1 raw sessions are compressed to `.jsonl.gz` after 90 days. The graph-memory workers previously crashed on encountering these files. This fix makes the workers transparently handle both `.jsonl` and `.jsonl.gz` formats.
+
+### Files Changed
+- `scripts/backfill-sessions.cjs`
+- `scripts/queue-worker.cjs`
+- `scripts/session-entity-extractor.cjs`

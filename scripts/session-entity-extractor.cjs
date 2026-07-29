@@ -21,6 +21,15 @@ const { extractWithLLM } = require('./llm-extractor.cjs');
 const { generateEmbedding, batchEmbedding } = require('./embeddings.cjs');
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
+
+/* ── File reading helper ─────────────────────── */
+function readSessionFile(filePath) {
+  if (filePath.endsWith('.gz')) {
+    return zlib.gunzipSync(fs.readFileSync(filePath)).toString("utf8");
+  }
+  return fs.readFileSync(filePath, "utf8");
+}
 
 /* ── Paths ───────────────────────────────────── */
 const MEMORY_DIR = path.join(
@@ -720,7 +729,7 @@ async function processSessionFile(sessionPath) {
 
   let entries;
   try {
-    const content = fs.readFileSync(sessionPath, "utf8");
+    const content = readSessionFile(sessionPath);
     entries = content
       .trim()
       .split("\n")
@@ -898,7 +907,7 @@ async function main() {
     try {
       sessionFiles = fs
         .readdirSync(SESSIONS_DIR)
-        .filter(f => f.endsWith(".jsonl"))
+        .filter(f => (f.endsWith(".jsonl") || f.endsWith(".jsonl.gz")) && !f.includes(".trajectory."))
         .filter(f => !f.includes(".deleted.") && !f.includes(".reset."))
         .map(f => {
           const full = path.join(SESSIONS_DIR, f);

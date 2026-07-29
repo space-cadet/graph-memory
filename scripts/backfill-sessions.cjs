@@ -26,7 +26,16 @@
 
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 const { extractWithLLM } = require("./llm-extractor.cjs");
+
+/* ── File reading helper ─────────────────────── */
+function readSessionFile(filePath) {
+  if (filePath.endsWith('.gz')) {
+    return zlib.gunzipSync(fs.readFileSync(filePath)).toString("utf8");
+  }
+  return fs.readFileSync(filePath, "utf8");
+}
 
 /* ── Paths ───────────────────────────────────── */
 const SESSIONS_DIR = path.join(
@@ -483,7 +492,7 @@ async function processSessionFile(sessionPath, dryRun) {
 
   let entries;
   try {
-    const content = fs.readFileSync(sessionPath, "utf8");
+    const content = readSessionFile(sessionPath);
     entries = content
       .trim()
       .split("\n")
@@ -718,7 +727,7 @@ async function main() {
   try {
     sessionFiles = fs
       .readdirSync(SESSIONS_DIR)
-      .filter((f) => f.endsWith(".jsonl") && !f.endsWith(".trajectory.jsonl") && !f.includes(".checkpoint."))
+      .filter((f) => (f.endsWith(".jsonl") || f.endsWith(".jsonl.gz")) && !f.includes(".trajectory.") && !f.includes(".checkpoint."))
       .map((f) => path.join(SESSIONS_DIR, f))
       .sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs);
   } catch (e) {

@@ -51,3 +51,6 @@ The graph integration track is now complete (T13, T14, T15). Next priority is ex
 - `implementation-details/T6-architectural-plan.md` — Six-phase plan
 - `implementation-details/tiered-memory-graph.md` — Tiered architecture spec
 - `implementation-details/graph-integration-plan.md` — Integration roadmap (NEW)
+
+## Recent Fixes
+- **2026-07-29**: Fixed graph-memory workers to handle `.jsonl.gz` compressed session files. Added `readSessionFile()` helper with `zlib.gunzipSync` to `backfill-sessions.cjs`, `queue-worker.cjs`, and `session-entity-extractor.cjs`. Updated file filters to include `.jsonl.gz`. Enables Tier 1 → Tier 2 pipeline to work with archived sessions per tiered-memory-graph spec.
