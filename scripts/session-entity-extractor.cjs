@@ -63,14 +63,19 @@ try {
   const Database = require("better-sqlite3");
   db = new Database(DB_PATH);
 } catch (e) {
-  console.error("better-sqlite3 not available, trying sqlite3...");
   try {
-    const sqlite3 = require("sqlite3");
-    db = new sqlite3.Database(DB_PATH);
+    // Node 22+ provides a synchronous SQLite driver, so extraction can run
+    // after node_modules cleanup.
+    const { DatabaseSync } = require("node:sqlite");
+    db = new DatabaseSync(DB_PATH);
   } catch (e2) {
-    console.error("No SQLite module available. Install with:");
-    console.error("  npm install better-sqlite3");
-    process.exit(1);
+    try {
+      const sqlite3 = require("sqlite3");
+      db = new sqlite3.Database(DB_PATH);
+    } catch (e3) {
+      console.error("No SQLite module available. Node 22+ or better-sqlite3/sqlite3 is required.");
+      process.exit(1);
+    }
   }
 }
 

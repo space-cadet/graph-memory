@@ -82,16 +82,29 @@ try {
   `);
 } catch (e) {
   try {
-    const sqlite3 = require("sqlite3");
-    db = new sqlite3.Database(DB_PATH);
-    dbMode = "sqlite3";
+    // Node 22+ ships a synchronous SQLite driver, so graph queries do not
+    // require the optional native better-sqlite3 package.
+    const { DatabaseSync } = require("node:sqlite");
+    db = new DatabaseSync(DB_PATH);
+    dbMode = "node:sqlite";
+    db.exec(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA synchronous = NORMAL;
+      PRAGMA cache_size = -64000;
+    `);
   } catch (e2) {
-    console.warn("Warning: No SQLite module available.");
+    try {
+      const sqlite3 = require("sqlite3");
+      db = new sqlite3.Database(DB_PATH);
+      dbMode = "sqlite3";
+    } catch (e3) {
+      console.warn("Warning: No SQLite module available.");
+    }
   }
 }
 
 function dbAll(sql, params = []) {
-  if (dbMode === "better-sqlite3") {
+  if (dbMode === "better-sqlite3" || dbMode === "node:sqlite") {
     return db.prepare(sql).all(...params);
   } else if (dbMode === "sqlite3") {
     return new Promise((resolve, reject) => {
@@ -105,7 +118,7 @@ function dbAll(sql, params = []) {
 }
 
 function dbGet(sql, params = []) {
-  if (dbMode === "better-sqlite3") {
+  if (dbMode === "better-sqlite3" || dbMode === "node:sqlite") {
     return db.prepare(sql).get(...params);
   } else if (dbMode === "sqlite3") {
     return new Promise((resolve, reject) => {
@@ -116,6 +129,36 @@ function dbGet(sql, params = []) {
     });
   }
   return null;
+}
+
+/**
+ * Decode an embedding BLOB without treating each byte as a vector element.
+ * node:sqlite returns BLOBs as Uint8Array, while better-sqlite3 returns a
+ * Buffer. Both are byte views over the underlying Float32 data.
+ */
+function blobToFloat32(blob) {
+  if (blob instanceof Float32Array) return blob;
+  if (Array.isArray(blob)) return Float32Array.from(blob);
+
+  if (ArrayBuffer.isView(blob)) {
+    if (blob.byteLength % Float32Array.BYTES_PER_ELEMENT !== 0) {
+      throw new Error(`Invalid embedding BLOB length: ${blob.byteLength} bytes`);
+    }
+    return new Float32Array(
+      blob.buffer,
+      blob.byteOffset,
+      blob.byteLength / Float32Array.BYTES_PER_ELEMENT
+    );
+  }
+
+  if (blob instanceof ArrayBuffer) {
+    if (blob.byteLength % Float32Array.BYTES_PER_ELEMENT !== 0) {
+      throw new Error(`Invalid embedding BLOB length: ${blob.byteLength} bytes`);
+    }
+    return new Float32Array(blob, 0, blob.byteLength / Float32Array.BYTES_PER_ELEMENT);
+  }
+
+  throw new Error(`Unsupported embedding value: ${typeof blob}`);
 }
 
 /* ── Query Bridge ────────────────────────────── */
@@ -211,7 +254,7 @@ class QueryBridge {
     const scored = [];
     for (const row of rows) {
       if (!row.embedding) continue;
-      const emb = new Float32Array(row.embedding);
+      const emb = blobToFloat32(row.embedding);
       const sim = cosineSimilarity(queryEmb, emb);
       scored.push({ ...row, similarity: sim });
     }

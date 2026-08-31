@@ -67,7 +67,16 @@ function initDb() {
     dbMode = "better-sqlite3";
     return;
   } catch (_) {
-    // fall through
+    // fall through to Node's built-in SQLite driver
+  }
+
+  try {
+    const { DatabaseSync } = require("node:sqlite");
+    db = new DatabaseSync(DB_PATH);
+    dbMode = "node:sqlite";
+    return;
+  } catch (_) {
+    // fall through to sqlite3
   }
 
   // Fallback: sqlite3 (async)
@@ -88,7 +97,7 @@ class StatementCache {
   }
 
   get(sql) {
-    if (!db || dbMode !== "better-sqlite3") return null;
+    if (!db || (dbMode !== "better-sqlite3" && dbMode !== "node:sqlite")) return null;
     if (this.cache.has(sql)) {
       // touch (move to end = most recently used)
       const stmt = this.cache.get(sql);
@@ -130,7 +139,7 @@ function dbAll(sql, params = []) {
     }
   }
 
-  if (dbMode === "better-sqlite3") {
+  if (dbMode === "better-sqlite3" || dbMode === "node:sqlite") {
     return db.prepare(sql).all(...params);
   }
   if (dbMode === "sqlite3") {
@@ -155,7 +164,7 @@ function dbGet(sql, params = []) {
     }
   }
 
-  if (dbMode === "better-sqlite3") {
+  if (dbMode === "better-sqlite3" || dbMode === "node:sqlite") {
     return db.prepare(sql).get(...params);
   }
   if (dbMode === "sqlite3") {

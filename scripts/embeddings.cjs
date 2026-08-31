@@ -18,6 +18,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { pathToFileURL } = require("url");
 
 const MEMORY_DIR = path.join(
   process.env.HOME,
@@ -27,6 +28,11 @@ const MEMORY_DIR = path.join(
 );
 const DB_PATH = path.join(MEMORY_DIR, "graph.db");
 const CACHE_DIR = path.join(process.env.HOME, ".cache", "transformers");
+// Keep the embedding runtime separate from the graph's optional SQLite
+// dependencies. This directory contains only @xenova/transformers and its
+// inference dependencies.
+const TRANSFORMERS_RUNTIME_DIR = process.env.GRAPH_MEMORY_TRANSFORMERS_DIR ||
+  path.join(process.env.HOME, ".cache", "graph-memory-transformers");
 
 /* ── Model config ────────────────────────────── */
 const MODEL_NAME = "Xenova/all-MiniLM-L6-v2";
@@ -43,11 +49,19 @@ try {
   dbMode = "better-sqlite3";
 } catch (e) {
   try {
-    const sqlite3 = require("sqlite3");
-    db = new sqlite3.Database(DB_PATH);
-    dbMode = "sqlite3";
+    // Node 22+ provides a synchronous SQLite driver, so embedding cache
+    // access does not require the optional native package.
+    const { DatabaseSync } = require("node:sqlite");
+    db = new DatabaseSync(DB_PATH);
+    dbMode = "node:sqlite";
   } catch (e2) {
-    console.warn("Warning: No SQLite module available. Caching disabled.");
+    try {
+      const sqlite3 = require("sqlite3");
+      db = new sqlite3.Database(DB_PATH);
+      dbMode = "sqlite3";
+    } catch (e3) {
+      console.warn("Warning: No SQLite module available. Caching disabled.");
+    }
   }
 }
 
@@ -134,7 +148,7 @@ function getCachedEmbedding(hash) {
 
   try {
     let row;
-    if (dbMode === "better-sqlite3") {
+    if (dbMode === "better-sqlite3" || dbMode === "node:sqlite") {
       const stmt = db.prepare("SELECT embedding FROM embedding_cache WHERE hash = ?");
       row = stmt.get(hash);
     } else {
@@ -166,7 +180,7 @@ function storeCachedEmbedding(hash, text, embedding) {
   const buffer = Buffer.from(embedding.buffer);
 
   try {
-    if (dbMode === "better-sqlite3") {
+    if (dbMode === "better-sqlite3" || dbMode === "node:sqlite") {
       const stmt = db.prepare(
         "INSERT OR REPLACE INTO embedding_cache (hash, text_preview, embedding) VALUES (?, ?, ?)"
       );
@@ -189,7 +203,20 @@ let extractor = null;
 async function loadModel() {
   if (extractor) return extractor;
 
-  const { pipeline: pl, env } = await import("@xenova/transformers");
+  let transformersModule;
+  try {
+    const modulePath = require.resolve("@xenova/transformers", {
+      paths: [TRANSFORMERS_RUNTIME_DIR, __dirname],
+    });
+    transformersModule = await import(pathToFileURL(modulePath).href);
+  } catch (error) {
+    throw new Error(
+      `MiniLM runtime unavailable. Install @xenova/transformers in ${TRANSFORMERS_RUNTIME_DIR} ` +
+      `or set GRAPH_MEMORY_TRANSFORMERS_DIR. (${error.message})`
+    );
+  }
+
+  const { pipeline: pl, env } = transformersModule;
 
   // Configure cache directory
   env.cacheDir = CACHE_DIR;
@@ -376,7 +403,7 @@ function getCacheStats() {
 
   if (db) {
     try {
-      if (dbMode === "better-sqlite3") {
+      if (dbMode === "better-sqlite3" || dbMode === "node:sqlite") {
         const row = db.prepare("SELECT COUNT(*) as count FROM embedding_cache").get();
         stats.dbCacheSize = row.count;
       } else {
@@ -394,7 +421,7 @@ function clearCache() {
   memoryCache.clear();
   if (db) {
     try {
-      if (dbMode === "better-sqlite3") {
+      if (dbMode === "better-sqlite3" || dbMode === "node:sqlite") {
         db.exec("DELETE FROM embedding_cache");
       } else {
         db.run("DELETE FROM embedding_cache");
