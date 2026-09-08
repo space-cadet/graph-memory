@@ -26,6 +26,8 @@ Core embedding generation module with caching.
 - **Batch**: `batchEmbedding(texts[])` → `Float32Array[]` (chunked, ~32/item)
 - **Cache**: Two-tier — in-memory LRU (500 entries) + SQLite `embedding_cache` table
 - **Offline**: Works offline after first model download to `~/.cache/transformers`
+- **Isolated runtime**: Resolves `@xenova/transformers` from `GRAPH_MEMORY_TRANSFORMERS_DIR` or `~/.cache/graph-memory-transformers`, preventing version conflicts
+- **Native SQLite fallback**: Uses `node:sqlite` (Node 22+) when `better-sqlite3` unavailable
 
 **CLI Usage:**
 ```bash
@@ -57,6 +59,20 @@ CREATE TABLE embedding_cache (
   created_at TEXT DEFAULT (datetime('now'))
 );
 ```
+
+### SQLite Driver Fallback Chain
+
+All graph-memory scripts use a consistent triple-fallback pattern:
+
+```javascript
+// 1. better-sqlite3 (preferred — synchronous, fast)
+// 2. node:sqlite / DatabaseSync (Node 22+ — built-in, no npm dependency)
+// 3. sqlite3 (async fallback — last resort)
+```
+
+This ensures the worker, skill, and CLI tools survive `node_modules` cleanup and restart without manual intervention.
+
+**Note on BLOB handling**: `node:sqlite` returns BLOBs as `Uint8Array`; `better-sqlite3` returns `Buffer`. Both are `ArrayBuffer.isView`, so use `new Float32Array(blob.buffer, blob.byteOffset, blob.byteLength / 4)` — never `new Float32Array(blob)` directly.
 
 ## File Formats
 
@@ -113,9 +129,10 @@ CREATE TABLE session_summaries (
 2. ~~No npm deps~~ → Fixed: `package.json` with `@xenova/transformers` and `better-sqlite3`
 3. **Journal truncation**: `journal-writer.cjs` truncates user messages to 100 chars, thinking to 300 chars
 4. **Error pollution**: Cron job failures create many `error` entities that drown out real work
+5. ~~Embedding cache BLOB bug~~ → **Fixed (2026-08-30)**: `node:sqlite` returns BLOBs as `Uint8Array`; `blobToFloat32()` in `query-bridge.cjs` now correctly decodes to `Float32Array`
 
 ## Future Tech
 
-- ~~Embedding-based semantic search (Phase 2)~~ → **Implemented** (T7b: `scripts/embeddings.cjs`)
+- ~~Embedding-based semantic search (Phase 2)~~ → **Implemented** (T7: `scripts/embeddings.cjs` + `query-bridge.cjs`)
 - Incremental watermark system for session files
 - `session-entity-extractor.cjs` — direct JSONL extraction (in progress)

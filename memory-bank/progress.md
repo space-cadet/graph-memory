@@ -1,5 +1,27 @@
 # Progress Log
 
+## 2026-08-30 — T7 Repair: Native SQLite Fallback + BLOB Decoding Fix
+
+### Session: Morning (~10:30 IST)
+- **Focus**: T7 — Fix semantic search after node_modules cleanup broke better-sqlite3
+- **Status**: Repair complete, validation passed
+
+#### Completed
+- ✅ Added `node:sqlite` / `DatabaseSync` fallback to `scripts/embeddings.cjs`
+- ✅ Added `node:sqlite` fallback to `scripts/query-bridge.cjs` with `blobToFloat32()`
+- ✅ Added `node:sqlite` fallback to `scripts/queue-worker.cjs`
+- ✅ Added `node:sqlite` fallback to `scripts/session-entity-extractor.cjs`
+- ✅ Added `node:sqlite` fallback to `skills/graph-memory/scripts/query.js`
+- ✅ Added `GRAPH_MEMORY_TRANSFORMERS_DIR` env var for isolated MiniLM runtime
+- ✅ Fixed BLOB decoding: `new Float32Array(blob.buffer, blob.byteOffset, blob.byteLength / 4)`
+- ✅ Validation: cosine similarities now in valid 0.3-0.8 range (was ~0.001-0.01)
+- ✅ Committed: `d26593e`
+
+#### Key Insight
+`node:sqlite` (Node 22+) provides a synchronous SQLite driver without npm dependencies. This makes the entire graph-memory stack resilient to `node_modules` cleanup. The trade-off is slightly different BLOB handling — `Uint8Array` vs `Buffer` — which requires an explicit decoding step.
+
+---
+
 ## 2026-06-19 — T1: Graph Initialization and Extraction Testing
 
 ### Session: Morning (08:12 IST)

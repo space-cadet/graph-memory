@@ -66,8 +66,12 @@
 **Context**: Literal string search can't bridge vocabulary gaps ("chat component" ≠ "chimera-chat")
 **Solution**: Store 384-dim embedding vectors per session summary and entity
 **Trade-off**: ~1.5KB per embedding, but enables cosine similarity search
-**Model**: all-MiniLM-L6-v2 (fast) or all-mpnet-base-v2 (better quality)
-**Status**: Designed (T7)
+**Model**: `Xenova/all-MiniLM-L6-v2` (fast) via isolated runtime
+**Status**: **Implemented** (T7 — embeddings.cjs + query-bridge.cjs)
+
+**BLOB Decoding Rule**: `node:sqlite` returns BLOBs as `Uint8Array` (not Buffer like `better-sqlite3`). Use `new Float32Array(blob.buffer, blob.byteOffset, blob.byteLength / 4)`. Never call `new Float32Array(blob)` on a byte array — each byte becomes a float element, producing garbage vectors.
+
+**SQLite Driver Chain**: `better-sqlite3` → `node:sqlite` (Node 22+) → `sqlite3`. All scripts support this triple fallback.
 
 ## Pattern: Temporal Relationship Decay
 
